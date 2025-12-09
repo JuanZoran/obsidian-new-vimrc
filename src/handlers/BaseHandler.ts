@@ -16,6 +16,8 @@
 
 import type { IEventBus, IErrorHandler } from '../types/services';
 import type { ICommandHandler, ParsedCommand, CommandType } from '../types/commands';
+import type { DebugModule } from '../types/settings';
+import { getLogger, ModuleLogger } from '../services/Logger';
 
 /**
  * Dependencies that can be injected into handlers
@@ -49,13 +51,20 @@ export abstract class BaseHandler implements ICommandHandler {
   protected errorHandler?: IErrorHandler;
 
   /**
+   * Logger instance for this handler
+   */
+  protected log: ModuleLogger;
+
+  /**
    * Create a new handler with dependencies
    *
    * @param deps - Handler dependencies (eventBus, errorHandler)
+   * @param logModule - The debug module name for logging
    */
-  constructor(deps: HandlerDependencies) {
+  constructor(deps: HandlerDependencies, logModule: DebugModule = 'mapping') {
     this.eventBus = deps.eventBus;
     this.errorHandler = deps.errorHandler;
+    this.log = getLogger(logModule);
   }
 
   /**
@@ -102,7 +111,7 @@ export abstract class BaseHandler implements ICommandHandler {
    * @param args - Additional arguments to log
    */
   protected debug(message: string, ...args: unknown[]): void {
-    console.log(`[Vimrc] ${message}`, ...args);
+    this.log.debug(message, ...args);
   }
 
   /**
@@ -112,7 +121,7 @@ export abstract class BaseHandler implements ICommandHandler {
    * @param args - Additional arguments to log
    */
   protected warn(message: string, ...args: unknown[]): void {
-    console.warn(`[Vimrc] ${message}`, ...args);
+    this.log.warn(message, ...args);
   }
 
   /**
@@ -122,6 +131,6 @@ export abstract class BaseHandler implements ICommandHandler {
    * @param error - The error object
    */
   protected error(message: string, error?: Error): void {
-    console.error(`[Vimrc] ${message}`, error);
+    this.log.error(message, error);
   }
 }

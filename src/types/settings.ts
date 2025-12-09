@@ -13,7 +13,11 @@ export type DebugModule =
   | 'exmap'       // ExmapHandler - Ex command mapping
   | 'vimAdapter'  // VimAdapter - CodeMirror Vim API
   | 'eventBus'    // EventBus - event system
-  | 'config';     // ConfigManager - settings management
+  | 'config'      // ConfigManager - settings management
+  | 'plugin'      // Main plugin lifecycle
+  | 'registry'    // CommandRegistry
+  | 'api'         // PluginApi - public API for other plugins
+  | 'statusBar';  // VimModeStatusBar - status bar UI
 
 /**
  * Debug settings for individual modules
@@ -37,6 +41,10 @@ export const DEFAULT_DEBUG_MODULES: Record<DebugModule, boolean> = {
   vimAdapter: true,
   eventBus: false,
   config: false,
+  plugin: true,
+  registry: true,
+  api: true,
+  statusBar: false,
 };
 
 /**
@@ -51,6 +59,10 @@ export const DEBUG_MODULE_INFO: Record<DebugModule, { name: string; desc: string
   vimAdapter: { name: 'Vim Adapter', desc: 'CodeMirror Vim API interactions' },
   eventBus: { name: 'Event Bus', desc: 'Internal event system (verbose)' },
   config: { name: 'Config', desc: 'Settings management' },
+  plugin: { name: 'Plugin', desc: 'Main plugin lifecycle events' },
+  registry: { name: 'Registry', desc: 'Command registry operations' },
+  api: { name: 'API', desc: 'Public API for other plugins' },
+  statusBar: { name: 'Status Bar', desc: 'Vim mode status bar UI' },
 };
 
 /**
@@ -65,6 +77,8 @@ export interface VimrcSettings {
   debugMode: boolean;
   /** Debug settings for individual modules */
   debug: DebugSettings;
+  /** Whether to show Vim mode in status bar */
+  showVimModeInStatusBar: boolean;
 }
 
 /**
@@ -83,6 +97,7 @@ export const DEFAULT_SETTINGS: VimrcSettings = {
   showLoadNotification: false,
   debugMode: false,
   debug: { ...DEFAULT_DEBUG_SETTINGS },
+  showVimModeInStatusBar: true,
 };
 
 /**
@@ -172,6 +187,10 @@ export function normalizeSettings(settings: Partial<VimrcSettings>): VimrcSettin
         ? settings.debugMode
         : DEFAULT_SETTINGS.debugMode,
     debug: normalizeDebugSettings(settings.debug),
+    showVimModeInStatusBar:
+      typeof settings.showVimModeInStatusBar === 'boolean'
+        ? settings.showVimModeInStatusBar
+        : DEFAULT_SETTINGS.showVimModeInStatusBar,
   };
 }
 
@@ -204,6 +223,10 @@ export function validateSettings(settings: unknown): string[] {
 
   if (s.debugMode !== undefined && typeof s.debugMode !== 'boolean') {
     errors.push('debugMode must be a boolean');
+  }
+
+  if (s.showVimModeInStatusBar !== undefined && typeof s.showVimModeInStatusBar !== 'boolean') {
+    errors.push('showVimModeInStatusBar must be a boolean');
   }
 
   if (s.debug !== undefined) {

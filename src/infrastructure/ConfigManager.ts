@@ -14,6 +14,9 @@ import type { IEventBus } from '../types/services';
 import type { IConfigManager, VimrcSettings } from '../types/settings';
 import { DEFAULT_SETTINGS, normalizeSettings, validateSettings } from '../types/settings';
 import { EventType } from '../types/events';
+import { getLogger } from '../services/Logger';
+
+const log = getLogger('config');
 
 /**
  * Plugin interface for settings persistence
@@ -88,7 +91,7 @@ export class ConfigManager implements IConfigManager {
       if (data && typeof data === 'object') {
         const errors = validateSettings(data);
         if (errors.length > 0) {
-          console.warn('[ConfigManager] Settings validation warnings:', errors);
+          log.warn('Settings validation warnings:', errors);
         }
         this.settings = normalizeSettings(data as Partial<VimrcSettings>);
       } else {
@@ -98,7 +101,7 @@ export class ConfigManager implements IConfigManager {
 
       this.initialized = true;
     } catch (error) {
-      console.error('[ConfigManager] Failed to load settings:', error);
+      log.error('Failed to load settings:', error);
       // Fall back to defaults on error
       this.settings = { ...DEFAULT_SETTINGS };
       this.initialized = true;
@@ -127,7 +130,7 @@ export class ConfigManager implements IConfigManager {
     // Validate the partial update
     const errors = validateSettings({ ...this.settings, ...partial });
     if (errors.length > 0) {
-      console.warn('[ConfigManager] Settings validation warnings:', errors);
+      log.warn('Settings validation warnings:', errors);
     }
 
     // Merge and normalize (Requirement 6.5)
@@ -194,7 +197,7 @@ export class ConfigManager implements IConfigManager {
       try {
         listener(currentSettings);
       } catch (error) {
-        console.error('[ConfigManager] Error in settings change listener:', error);
+        log.error('Error in settings change listener:', error);
       }
     }
   }

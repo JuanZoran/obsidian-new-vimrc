@@ -19,48 +19,15 @@ import { BaseHandler, HandlerDependencies } from './BaseHandler';
 import type { IMappingStore, KeyMapping } from '../types/mappings';
 import { VimMode, MappingStatus } from '../types/mappings';
 import type { ParsedCommand, CommandType } from '../types/commands';
-import { CommandType as CT } from '../types/commands';
+import {
+  CommandType as CT,
+  MAPPING_COMMAND_TYPES,
+  NON_RECURSIVE_COMMAND_TYPES,
+  UNMAP_COMMAND_TYPES,
+} from '../types/commands';
 import { getLogger } from '../services/Logger';
 
 const log = getLogger('mapping');
-
-/**
- * Mapping command types that this handler supports
- */
-const MAPPING_COMMAND_TYPES: CommandType[] = [
-  CT.MAP,
-  CT.NMAP,
-  CT.IMAP,
-  CT.VMAP,
-  CT.NOREMAP,
-  CT.NNOREMAP,
-  CT.INOREMAP,
-  CT.VNOREMAP,
-  CT.UNMAP,
-  CT.NUNMAP,
-  CT.IUNMAP,
-  CT.VUNMAP,
-];
-
-/**
- * Non-recursive mapping command types
- */
-const NON_RECURSIVE_TYPES: CommandType[] = [
-  CT.NOREMAP,
-  CT.NNOREMAP,
-  CT.INOREMAP,
-  CT.VNOREMAP,
-];
-
-/**
- * Unmap command types
- */
-const UNMAP_COMMAND_TYPES: CommandType[] = [
-  CT.UNMAP,
-  CT.NUNMAP,
-  CT.IUNMAP,
-  CT.VUNMAP,
-];
 
 /**
  * Dependencies for MappingHandler
@@ -87,7 +54,7 @@ export class MappingHandler extends BaseHandler {
    * @param deps - Handler dependencies including MappingStore
    */
   constructor(deps: MappingHandlerDependencies) {
-    super(deps);
+    super(deps, 'mapping');
     this.mappingStore = deps.mappingStore;
   }
 
@@ -202,7 +169,7 @@ export class MappingHandler extends BaseHandler {
    * Check if a command type creates a recursive mapping
    */
   private isRecursiveMapping(type: CommandType): boolean {
-    return !NON_RECURSIVE_TYPES.includes(type);
+    return !NON_RECURSIVE_COMMAND_TYPES.includes(type);
   }
 
   /**

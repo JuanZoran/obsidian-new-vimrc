@@ -13,26 +13,14 @@
 import { App } from 'obsidian';
 import { BaseHandler, HandlerDependencies } from './BaseHandler';
 import { ObsidianCommandExecutor } from './ObsidianCommandExecutor';
-import type { ParsedCommand, CommandType } from '../types/commands';
-import { CommandType as CT } from '../types/commands';
+import type { ParsedCommand, CommandType, IObmapProvider, ObmapDefinition } from '../types/commands';
+import { CommandType as CT, OBMAP_COMMAND_TYPES } from '../types/commands';
 import { getLogger } from '../services/Logger';
 
 const log = getLogger('obmap');
 
-/**
- * Obmap command types that this handler supports
- */
-const OBMAP_COMMAND_TYPES: CommandType[] = [CT.OBMAP, CT.NOBMAP, CT.IOBMAP, CT.VOBMAP];
-
-/**
- * Registered obmap command definition
- */
-export interface ObmapDefinition {
-  key: string;
-  commandId: string;
-  mode: 'normal' | 'insert' | 'visual' | 'all';
-  lineNumber: number;
-}
+// Re-export for backward compatibility
+export type { ObmapDefinition } from '../types/commands';
 
 /**
  * Dependencies for ObmapHandler
@@ -43,15 +31,16 @@ export interface ObmapHandlerDependencies extends HandlerDependencies {
 
 /**
  * ObmapHandler implementation
+ * Implements IObmapProvider for decoupled access from VimrcLoader
  */
-export class ObmapHandler extends BaseHandler {
+export class ObmapHandler extends BaseHandler implements IObmapProvider {
   readonly supportedTypes = OBMAP_COMMAND_TYPES;
 
   private commandExecutor: ObsidianCommandExecutor;
   private obmapDefinitions: ObmapDefinition[] = [];
 
   constructor(deps: ObmapHandlerDependencies) {
-    super(deps);
+    super(deps, 'obmap');
     this.commandExecutor = new ObsidianCommandExecutor(deps.app);
   }
 

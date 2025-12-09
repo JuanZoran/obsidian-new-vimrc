@@ -11,7 +11,8 @@ import { Plugin, TAbstractFile, Notice } from 'obsidian';
 import {
   ServiceContainer, EventBus, ConfigManager, EnhancedErrorHandler,
   VimAdapter, VimrcLoader, VimrcParser, MappingStore, MappingApplier,
-  CommandRegistry, SettingsTab, createFileAdapter, PluginApi, Logger,
+  CommandRegistry, SettingsTab, createFileAdapter, PluginApi, Logger, getLogger,
+  VimModeStatusBar,
 } from './src';
 import { ServiceTokens } from './src/types/services';
 import type { VimrcSettings } from './src/types/settings';
@@ -24,12 +25,14 @@ import { LetHandler } from './src/handlers/LetHandler';
 export default class VimrcPlugin extends Plugin {
   private container!: ServiceContainer;
   private pluginApi!: PluginApi;
+  private vimModeStatusBar: VimModeStatusBar | null = null;
   private fileWatcherRegistered = false;
   private debounceTimer: NodeJS.Timeout | null = null;
 
   async onload(): Promise<void> {
-    console.log('[Vimrc] Loading plugin...');
     await this.initializeServices();
+    const log = getLogger('plugin');
+    log.info('Loading plugin...');
 
     const configManager = this.container.resolve(ServiceTokens.ConfigManager);
     const loader = this.container.resolve(ServiceTokens.VimrcLoader);
@@ -39,17 +42,27 @@ export default class VimrcPlugin extends Plugin {
     }));
     this.setupFileWatcher();
 
+    // Initialize Vim mode status bar
+    this.vimModeStatusBar = new VimModeStatusBar({
+      plugin: this,
+      app: this.app,
+      configManager,
+    });
+    this.vimModeStatusBar.initialize();
+
     this.app.workspace.onLayoutReady(async () => {
       this.reportLoadResults(await loader.load());
     });
-    console.log('[Vimrc] Plugin loaded');
+    log.info('Plugin loaded');
   }
 
   onunload(): void {
-    console.log('[Vimrc] Unloading plugin...');
+    const log = getLogger('plugin');
+    log.info('Unloading plugin...');
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    if (this.vimModeStatusBar) this.vimModeStatusBar.destroy();
     if (this.container) this.container.dispose();
-    console.log('[Vimrc] Plugin unloaded');
+    log.info('Plugin unloaded');
   }
 
   private async initializeServices(): Promise<void> {
@@ -113,7 +126,7 @@ export default class VimrcPlugin extends Plugin {
         createFileAdapter(this.app)
       );
       loader.setVimAdapter(vimAdapter);
-      loader.setHandlers(obmapHandler, exmapHandler);
+      loader.setProviders(obmapHandler, exmapHandler);
       return loader;
     });
 
@@ -158,8 +171,9 @@ export default class VimrcPlugin extends Plugin {
     success: boolean; mappingCount: number; path: string | null;
     errors: Array<{ lineNumber: number; message: string }>;
   }): void {
+    const log = getLogger('plugin');
     const settings = this.container.resolve(ServiceTokens.ConfigManager).getSettings();
-    if (result.path) console.log(`[Vimrc] Loaded from ${result.path}: ${result.mappingCount} mapping(s)`);
+    if (result.path) log.info(`Loaded from ${result.path}: ${result.mappingCount} mapping(s)`);
     for (const error of result.errors) new Notice(`Vimrc error (line ${error.lineNumber}): ${error.message}`);
     if (settings.showLoadNotification && result.success) new Notice(`Vimrc loaded: ${result.mappingCount} mapping(s)`);
   }

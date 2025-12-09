@@ -335,7 +335,7 @@ export class VimAdapter implements IVimAdapter {
           break;
       }
     } catch (error) {
-      console.error(`[VimAdapter] Failed to execute ${operation.type}:`, error);
+      log.error(`Failed to execute ${operation.type}:`, error);
     }
   }
 

@@ -36,9 +36,6 @@ export enum CommandType {
   IUNMAP = 'iunmap',
   VUNMAP = 'vunmap',
 
-  // Amap commands - mapping to async actions
-  AMAP = 'amap',
-
   // Variable assignment
   LET = 'let',
 
@@ -146,3 +143,114 @@ export interface ICommandRegistry {
    */
   cleanup(): void;
 }
+
+/**
+ * Obmap definition for mapping keys to Obsidian commands
+ */
+export interface ObmapDefinition {
+  key: string;
+  commandId: string;
+  mode: 'normal' | 'insert' | 'visual' | 'all';
+  lineNumber: number;
+}
+
+/**
+ * Exmap definition for ex commands that execute Obsidian commands
+ */
+export interface ExmapDefinition {
+  name: string;
+  commandId: string;
+  lineNumber: number;
+}
+
+/**
+ * Provider interface for obmap definitions
+ * Decouples VimrcLoader from ObmapHandler implementation
+ */
+export interface IObmapProvider {
+  /**
+   * Get all registered obmap definitions
+   */
+  getObmapDefinitions(): ObmapDefinition[];
+
+  /**
+   * Execute an Obsidian command by ID
+   */
+  executeObsidianCommand(commandId: string): Promise<boolean>;
+}
+
+/**
+ * Provider interface for exmap definitions
+ * Decouples VimrcLoader from ExmapHandler implementation
+ */
+export interface IExmapProvider {
+  /**
+   * Get all registered exmap definitions
+   */
+  getExmapDefinitions(): ExmapDefinition[];
+
+  /**
+   * Execute an Obsidian command by ID
+   */
+  executeObsidianCommand(commandId: string): Promise<boolean>;
+}
+
+// ============================================
+// Command Type Constants
+// Centralized definitions for handler registration
+// ============================================
+
+/** All mapping command types (map, nmap, noremap, unmap, etc.) */
+export const MAPPING_COMMAND_TYPES: CommandType[] = [
+  CommandType.MAP,
+  CommandType.NMAP,
+  CommandType.IMAP,
+  CommandType.VMAP,
+  CommandType.NOREMAP,
+  CommandType.NNOREMAP,
+  CommandType.INOREMAP,
+  CommandType.VNOREMAP,
+  CommandType.UNMAP,
+  CommandType.NUNMAP,
+  CommandType.IUNMAP,
+  CommandType.VUNMAP,
+];
+
+/** Non-recursive mapping command types */
+export const NON_RECURSIVE_COMMAND_TYPES: CommandType[] = [
+  CommandType.NOREMAP,
+  CommandType.NNOREMAP,
+  CommandType.INOREMAP,
+  CommandType.VNOREMAP,
+];
+
+/** Unmap command types */
+export const UNMAP_COMMAND_TYPES: CommandType[] = [
+  CommandType.UNMAP,
+  CommandType.NUNMAP,
+  CommandType.IUNMAP,
+  CommandType.VUNMAP,
+];
+
+/** Obmap command types (direct Obsidian command mapping) */
+export const OBMAP_COMMAND_TYPES: CommandType[] = [
+  CommandType.OBMAP,
+  CommandType.NOBMAP,
+  CommandType.IOBMAP,
+  CommandType.VOBMAP,
+];
+
+/** Exmap command types (ex command definitions) */
+export const EXMAP_COMMAND_TYPES: CommandType[] = [
+  CommandType.EXMAP,
+  CommandType.OBCOMMAND,
+];
+
+/** Let command types (variable assignment) */
+export const LET_COMMAND_TYPES: CommandType[] = [CommandType.LET];
+
+/** All Obsidian-specific executor command types */
+export const EXECUTOR_COMMAND_TYPES: CommandType[] = [
+  ...EXMAP_COMMAND_TYPES,
+  ...OBMAP_COMMAND_TYPES,
+];

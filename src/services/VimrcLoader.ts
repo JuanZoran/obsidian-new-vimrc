@@ -21,12 +21,10 @@ import type {
   IErrorHandler,
 } from '../types/services';
 import type { IConfigManager } from '../types/settings';
-import type { ICommandRegistry, ParseResult } from '../types/commands';
+import type { ICommandRegistry, ParseResult, IObmapProvider, IExmapProvider, ObmapDefinition, ExmapDefinition } from '../types/commands';
 import type { IMappingApplier, IMappingStore } from '../types/mappings';
 import { EventType } from '../types/events';
 import { CommandType } from '../types/commands';
-import type { ObmapHandler, ObmapDefinition } from '../handlers/ObmapHandler';
-import type { ExmapHandler, ExmapDefinition } from '../handlers/ExmapHandler';
 import { getLogger } from './Logger';
 
 /**
@@ -93,14 +91,14 @@ export class VimrcLoader implements IVimrcLoader {
   private vimAdapter: IVimAdapter | null = null;
 
   /**
-   * ObmapHandler reference for getting obmap definitions
+   * Obmap provider for getting obmap definitions (decoupled from ObmapHandler)
    */
-  private obmapHandler: ObmapHandler | null = null;
+  private obmapProvider: IObmapProvider | null = null;
 
   /**
-   * ExmapHandler reference for getting exmap definitions
+   * Exmap provider for getting exmap definitions (decoupled from ExmapHandler)
    */
-  private exmapHandler: ExmapHandler | null = null;
+  private exmapProvider: IExmapProvider | null = null;
 
   /**
    * Last load result
@@ -147,11 +145,12 @@ export class VimrcLoader implements IVimrcLoader {
   }
 
   /**
-   * Set handler references for getting definitions
+   * Set provider references for getting definitions
+   * Uses interfaces for decoupling from concrete handler implementations
    */
-  setHandlers(obmapHandler: ObmapHandler, exmapHandler: ExmapHandler): void {
-    this.obmapHandler = obmapHandler;
-    this.exmapHandler = exmapHandler;
+  setProviders(obmapProvider: IObmapProvider, exmapProvider: IExmapProvider): void {
+    this.obmapProvider = obmapProvider;
+    this.exmapProvider = exmapProvider;
   }
 
   /**
@@ -292,8 +291,8 @@ export class VimrcLoader implements IVimrcLoader {
     }
 
     // Apply obmaps
-    if (this.obmapHandler) {
-      const obmaps = this.obmapHandler.getObmapDefinitions();
+    if (this.obmapProvider) {
+      const obmaps = this.obmapProvider.getObmapDefinitions();
       log.debug(`Applying ${obmaps.length} obmaps`);
       for (let i = 0; i < obmaps.length; i++) {
         const obmap = obmaps[i];
@@ -302,8 +301,8 @@ export class VimrcLoader implements IVimrcLoader {
     }
 
     // Apply exmaps
-    if (this.exmapHandler) {
-      const exmaps = this.exmapHandler.getExmapDefinitions();
+    if (this.exmapProvider) {
+      const exmaps = this.exmapProvider.getExmapDefinitions();
       log.debug(`Applying ${exmaps.length} exmaps`);
       for (const exmap of exmaps) {
         this.applyExmapToVim(exmap);
@@ -315,16 +314,16 @@ export class VimrcLoader implements IVimrcLoader {
    * Apply a single obmap to Vim
    */
   private applyObmapToVim(obmap: ObmapDefinition, index: number): void {
-    if (!this.vimAdapter || !this.obmapHandler) return;
+    if (!this.vimAdapter || !this.obmapProvider) return;
 
     try {
       const actionName = `obmap_${index}`;
-      const handler = this.obmapHandler;
+      const provider = this.obmapProvider;
       log.debug(`Applying obmap: ${obmap.key} -> ${obmap.commandId} (${obmap.mode})`);
 
       // Define action that executes the Obsidian command
       this.vimAdapter.defineAction(actionName, () => {
-        handler.executeObsidianCommand(obmap.commandId);
+        provider.executeObsidianCommand(obmap.commandId);
       });
 
       // Map key to action based on mode
@@ -346,15 +345,15 @@ export class VimrcLoader implements IVimrcLoader {
    * Apply a single exmap to Vim
    */
   private applyExmapToVim(exmap: ExmapDefinition): void {
-    if (!this.vimAdapter || !this.exmapHandler) return;
+    if (!this.vimAdapter || !this.exmapProvider) return;
 
     try {
-      const handler = this.exmapHandler;
+      const provider = this.exmapProvider;
       log.debug(`Applying exmap: :${exmap.name} -> ${exmap.commandId}`);
 
       // Define ex command
       this.vimAdapter.defineEx(exmap.name, exmap.name, () => {
-        handler.executeObsidianCommand(exmap.commandId);
+        provider.executeObsidianCommand(exmap.commandId);
       });
     } catch (error) {
       log.error(`Failed to apply exmap ${exmap.name}:`, error);

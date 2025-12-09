@@ -11,25 +11,14 @@
 import { App } from 'obsidian';
 import { BaseHandler, HandlerDependencies } from './BaseHandler';
 import { ObsidianCommandExecutor } from './ObsidianCommandExecutor';
-import type { ParsedCommand, CommandType } from '../types/commands';
-import { CommandType as CT } from '../types/commands';
+import type { ParsedCommand, CommandType, IExmapProvider, ExmapDefinition } from '../types/commands';
+import { CommandType as CT, EXMAP_COMMAND_TYPES } from '../types/commands';
 import { getLogger } from '../services/Logger';
 
 const log = getLogger('exmap');
 
-/**
- * Exmap command types that this handler supports
- */
-const EXMAP_COMMAND_TYPES: CommandType[] = [CT.EXMAP, CT.OBCOMMAND];
-
-/**
- * Registered exmap command definition
- */
-export interface ExmapDefinition {
-  name: string;
-  commandId: string;
-  lineNumber: number;
-}
+// Re-export for backward compatibility
+export type { ExmapDefinition } from '../types/commands';
 
 /**
  * Dependencies for ExmapHandler
@@ -40,15 +29,16 @@ export interface ExmapHandlerDependencies extends HandlerDependencies {
 
 /**
  * ExmapHandler implementation
+ * Implements IExmapProvider for decoupled access from VimrcLoader
  */
-export class ExmapHandler extends BaseHandler {
+export class ExmapHandler extends BaseHandler implements IExmapProvider {
   readonly supportedTypes = EXMAP_COMMAND_TYPES;
 
   private commandExecutor: ObsidianCommandExecutor;
   private exmapDefinitions: Map<string, ExmapDefinition> = new Map();
 
   constructor(deps: ExmapHandlerDependencies) {
-    super(deps);
+    super(deps, 'exmap');
     this.commandExecutor = new ObsidianCommandExecutor(deps.app);
   }
 

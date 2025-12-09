@@ -5,7 +5,7 @@
 import type { EventType, EventPayload, EventHandler, Unsubscribe } from './events';
 import type { VimrcSettings, IConfigManager } from './settings';
 import type { IMappingStore, IMappingApplier, VimMode, KeyMapping } from './mappings';
-import type { ICommandRegistry, ICommandHandler, ParsedCommand, ParseResult } from './commands';
+import type { ICommandRegistry, ICommandHandler, ParsedCommand, ParseResult, IObmapProvider, IExmapProvider } from './commands';
 
 /**
  * Service token type - a branded symbol for type-safe dependency injection
@@ -299,4 +299,6 @@ export const ServiceTokens = {
   MappingStore: Symbol('MappingStore') as ServiceToken<IMappingStore>,
   MappingApplier: Symbol('MappingApplier') as ServiceToken<IMappingApplier>,
   CommandRegistry: Symbol('CommandRegistry') as ServiceToken<ICommandRegistry>,
+  ObmapProvider: Symbol('ObmapProvider') as ServiceToken<IObmapProvider>,
+  ExmapProvider: Symbol('ExmapProvider') as ServiceToken<IExmapProvider>,
 } as const;

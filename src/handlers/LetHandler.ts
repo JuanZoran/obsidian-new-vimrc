@@ -13,12 +13,7 @@
 
 import { BaseHandler, HandlerDependencies } from './BaseHandler';
 import type { ParsedCommand, CommandType } from '../types/commands';
-import { CommandType as CT } from '../types/commands';
-
-/**
- * Let command types that this handler supports
- */
-const LET_COMMAND_TYPES: CommandType[] = [CT.LET];
+import { CommandType as CT, LET_COMMAND_TYPES } from '../types/commands';
 
 /**
  * Variable definition
@@ -59,7 +54,7 @@ export class LetHandler extends BaseHandler {
    * @param deps - Handler dependencies
    */
   constructor(deps: LetHandlerDependencies) {
-    super(deps);
+    super(deps, 'mapping');
     this.onLeaderKeyChange = deps.onLeaderKeyChange;
   }
 

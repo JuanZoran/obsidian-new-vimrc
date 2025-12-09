@@ -1,37 +1,30 @@
 import { 
     CommandRegistry, 
-    createConfiguredRegistry,
     MAPPING_COMMAND_TYPES,
     EXECUTOR_COMMAND_TYPES 
 } from '../../src/registry/CommandRegistry';
-import { 
-    CommandType, 
-    ParsedCommand, 
-    HandlerContext, 
-    CommandHandler,
-    VimrcSettings,
-    DEFAULT_SETTINGS
-} from '../../src/types';
+import { CommandType, ParsedCommand } from '../../src/types/commands';
+import { ICommandHandler } from '../../src/types/commands';
 
 /**
  * Mock command handler for testing
  */
-class MockHandler implements CommandHandler {
-    readonly commandType: CommandType;
+class MockHandler implements ICommandHandler {
+    readonly supportedTypes: CommandType[];
     public handledCommands: ParsedCommand[] = [];
     public cleanupCalled = false;
     private canHandleTypes: CommandType[];
 
-    constructor(commandType: CommandType, canHandleTypes?: CommandType[]) {
-        this.commandType = commandType;
-        this.canHandleTypes = canHandleTypes || [commandType];
+    constructor(supportedTypes: CommandType[], canHandleTypes?: CommandType[]) {
+        this.supportedTypes = supportedTypes;
+        this.canHandleTypes = canHandleTypes || supportedTypes;
     }
 
     canHandle(command: ParsedCommand): boolean {
         return this.canHandleTypes.includes(command.type);
     }
 
-    async handle(command: ParsedCommand, context: HandlerContext): Promise<void> {
+    async handle(command: ParsedCommand): Promise<void> {
         this.handledCommands.push(command);
     }
 
@@ -52,16 +45,6 @@ function createMockCommand(type: CommandType, args: string[] = []): ParsedComman
     };
 }
 
-/**
- * Create a mock handler context
- */
-function createMockContext(): HandlerContext {
-    return {
-        plugin: {},
-        settings: { ...DEFAULT_SETTINGS }
-    };
-}
-
 describe('CommandRegistry', () => {
     let registry: CommandRegistry;
 
@@ -70,69 +53,64 @@ describe('CommandRegistry', () => {
     });
 
     describe('register', () => {
-        it('should register a handler for a command type', () => {
-            const handler = new MockHandler(CommandType.MAP);
-            registry.register(CommandType.MAP, handler);
+        it('should register a handler for its supported types', () => {
+            const handler = new MockHandler([CommandType.MAP]);
+            registry.register(handler);
 
             expect(registry.hasHandler(CommandType.MAP)).toBe(true);
-            expect(registry.getHandlersForType(CommandType.MAP)).toContain(handler);
         });
 
-        it('should allow multiple handlers for the same command type', () => {
-            const handler1 = new MockHandler(CommandType.MAP);
-            const handler2 = new MockHandler(CommandType.MAP);
-
-            registry.register(CommandType.MAP, handler1);
-            registry.register(CommandType.MAP, handler2);
-
-            const handlers = registry.getHandlersForType(CommandType.MAP);
-            expect(handlers).toHaveLength(2);
-            expect(handlers).toContain(handler1);
-            expect(handlers).toContain(handler2);
-        });
-
-        it('should track unique handlers', () => {
-            const handler = new MockHandler(CommandType.MAP);
-            
-            // Register same handler for multiple types
-            registry.register(CommandType.MAP, handler);
-            registry.register(CommandType.NMAP, handler);
-
-            // Should only appear once in allHandlers
-            expect(registry.getHandlers()).toHaveLength(1);
-        });
-    });
-
-    describe('registerForTypes', () => {
-        it('should register a handler for multiple command types', () => {
-            const handler = new MockHandler(CommandType.MAP, [
-                CommandType.MAP,
-                CommandType.NMAP,
-                CommandType.IMAP
-            ]);
-
-            registry.registerForTypes(
-                [CommandType.MAP, CommandType.NMAP, CommandType.IMAP],
-                handler
-            );
+        it('should register handler for multiple supported types', () => {
+            const handler = new MockHandler([CommandType.MAP, CommandType.NMAP, CommandType.IMAP]);
+            registry.register(handler);
 
             expect(registry.hasHandler(CommandType.MAP)).toBe(true);
             expect(registry.hasHandler(CommandType.NMAP)).toBe(true);
             expect(registry.hasHandler(CommandType.IMAP)).toBe(true);
             expect(registry.getRegisteredTypeCount()).toBe(3);
         });
+
+        it('should track unique handlers', () => {
+            const handler = new MockHandler([CommandType.MAP, CommandType.NMAP]);
+            registry.register(handler);
+
+            // Should only appear once in allHandlers
+            expect(registry.getHandlers()).toHaveLength(1);
+        });
+
+        it('should allow multiple handlers for the same type', () => {
+            const handler1 = new MockHandler([CommandType.MAP]);
+            const handler2 = new MockHandler([CommandType.MAP]);
+
+            registry.register(handler1);
+            registry.register(handler2);
+
+            expect(registry.getHandlers()).toHaveLength(2);
+        });
     });
 
-    describe('execute', () => {
-        it('should route command to the correct handler', async () => {
-            const mapHandler = new MockHandler(CommandType.MAP);
-            const obcommandHandler = new MockHandler(CommandType.OBCOMMAND);
+    describe('unregister', () => {
+        it('should remove handler from all its types', () => {
+            const handler = new MockHandler([CommandType.MAP, CommandType.NMAP]);
+            registry.register(handler);
+            registry.unregister(handler);
 
-            registry.register(CommandType.MAP, mapHandler);
-            registry.register(CommandType.OBCOMMAND, obcommandHandler);
+            expect(registry.hasHandler(CommandType.MAP)).toBe(false);
+            expect(registry.hasHandler(CommandType.NMAP)).toBe(false);
+            expect(registry.getHandlers()).toHaveLength(0);
+        });
+    });
+
+    describe('route', () => {
+        it('should route command to the correct handler', async () => {
+            const mapHandler = new MockHandler([CommandType.MAP]);
+            const obcommandHandler = new MockHandler([CommandType.OBCOMMAND]);
+
+            registry.register(mapHandler);
+            registry.register(obcommandHandler);
 
             const command = createMockCommand(CommandType.MAP, ['jk', '<Esc>']);
-            await registry.execute(command, createMockContext());
+            await registry.route(command);
 
             expect(mapHandler.handledCommands).toHaveLength(1);
             expect(mapHandler.handledCommands[0]).toBe(command);
@@ -140,47 +118,51 @@ describe('CommandRegistry', () => {
         });
 
         it('should use canHandle to find the right handler', async () => {
-            const handler1 = new MockHandler(CommandType.MAP, []); // Can't handle anything
-            const handler2 = new MockHandler(CommandType.MAP, [CommandType.MAP]);
+            const handler1 = new MockHandler([CommandType.MAP], []); // Can't handle anything
+            const handler2 = new MockHandler([CommandType.MAP], [CommandType.MAP]);
 
-            registry.register(CommandType.MAP, handler1);
-            registry.register(CommandType.MAP, handler2);
+            registry.register(handler1);
+            registry.register(handler2);
 
             const command = createMockCommand(CommandType.MAP, ['jk', '<Esc>']);
-            await registry.execute(command, createMockContext());
+            await registry.route(command);
 
             expect(handler1.handledCommands).toHaveLength(0);
             expect(handler2.handledCommands).toHaveLength(1);
         });
 
         it('should log warning when no handler found', async () => {
+            // Logger uses console.warn internally, so we spy on it
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
             const command = createMockCommand(CommandType.UNKNOWN, []);
-            await registry.execute(command, createMockContext());
+            await registry.route(command);
 
+            // Logger formats messages with prefix, so check for the message content
             expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Vimrc'),
                 expect.stringContaining('No handler found')
             );
 
             consoleSpy.mockRestore();
         });
 
-        it('should propagate errors from handlers', async () => {
-            const errorHandler: CommandHandler = {
-                commandType: CommandType.MAP,
+        it('should isolate errors and not throw', async () => {
+            const errorHandler: ICommandHandler = {
+                supportedTypes: [CommandType.MAP],
                 canHandle: () => true,
                 handle: async () => {
                     throw new Error('Test error');
-                }
+                },
+                cleanup: () => {}
             };
 
-            registry.register(CommandType.MAP, errorHandler);
+            registry.register(errorHandler);
 
             const command = createMockCommand(CommandType.MAP, ['jk', '<Esc>']);
             
-            await expect(registry.execute(command, createMockContext()))
-                .rejects.toThrow('Test error');
+            // Should not throw - error isolation
+            await expect(registry.route(command)).resolves.toBeUndefined();
         });
     });
 
@@ -190,7 +172,7 @@ describe('CommandRegistry', () => {
         });
 
         it('should return true for registered types', () => {
-            registry.register(CommandType.MAP, new MockHandler(CommandType.MAP));
+            registry.register(new MockHandler([CommandType.MAP]));
             expect(registry.hasHandler(CommandType.MAP)).toBe(true);
         });
     });
@@ -201,11 +183,11 @@ describe('CommandRegistry', () => {
         });
 
         it('should return all unique handlers', () => {
-            const handler1 = new MockHandler(CommandType.MAP);
-            const handler2 = new MockHandler(CommandType.OBCOMMAND);
+            const handler1 = new MockHandler([CommandType.MAP]);
+            const handler2 = new MockHandler([CommandType.OBCOMMAND]);
 
-            registry.register(CommandType.MAP, handler1);
-            registry.register(CommandType.OBCOMMAND, handler2);
+            registry.register(handler1);
+            registry.register(handler2);
 
             const handlers = registry.getHandlers();
             expect(handlers).toHaveLength(2);
@@ -214,12 +196,12 @@ describe('CommandRegistry', () => {
         });
     });
 
-    describe('clear', () => {
+    describe('cleanup', () => {
         it('should remove all handlers', () => {
-            registry.register(CommandType.MAP, new MockHandler(CommandType.MAP));
-            registry.register(CommandType.OBCOMMAND, new MockHandler(CommandType.OBCOMMAND));
+            registry.register(new MockHandler([CommandType.MAP]));
+            registry.register(new MockHandler([CommandType.OBCOMMAND]));
 
-            registry.clear();
+            registry.cleanup();
 
             expect(registry.getHandlers()).toHaveLength(0);
             expect(registry.hasHandler(CommandType.MAP)).toBe(false);
@@ -227,79 +209,28 @@ describe('CommandRegistry', () => {
         });
 
         it('should call cleanup on all handlers', () => {
-            const handler1 = new MockHandler(CommandType.MAP);
-            const handler2 = new MockHandler(CommandType.OBCOMMAND);
+            const handler1 = new MockHandler([CommandType.MAP]);
+            const handler2 = new MockHandler([CommandType.OBCOMMAND]);
 
-            registry.register(CommandType.MAP, handler1);
-            registry.register(CommandType.OBCOMMAND, handler2);
+            registry.register(handler1);
+            registry.register(handler2);
 
-            registry.clear();
+            registry.cleanup();
 
             expect(handler1.cleanupCalled).toBe(true);
             expect(handler2.cleanupCalled).toBe(true);
         });
 
         it('should call cleanup only once per unique handler', () => {
-            const handler = new MockHandler(CommandType.MAP, [
-                CommandType.MAP,
-                CommandType.NMAP
-            ]);
+            const handler = new MockHandler([CommandType.MAP, CommandType.NMAP]);
             let cleanupCount = 0;
             handler.cleanup = () => { cleanupCount++; };
 
-            registry.register(CommandType.MAP, handler);
-            registry.register(CommandType.NMAP, handler);
-
-            registry.clear();
+            registry.register(handler);
+            registry.cleanup();
 
             expect(cleanupCount).toBe(1);
         });
-    });
-});
-
-describe('createConfiguredRegistry', () => {
-    it('should create registry with KeyMapper registered for mapping types', () => {
-        const keyMapper = new MockHandler(CommandType.MAP, MAPPING_COMMAND_TYPES);
-        const commandExecutor = new MockHandler(CommandType.OBCOMMAND, EXECUTOR_COMMAND_TYPES);
-
-        const registry = createConfiguredRegistry(keyMapper, commandExecutor);
-
-        // Check all mapping types are registered
-        for (const type of MAPPING_COMMAND_TYPES) {
-            expect(registry.hasHandler(type)).toBe(true);
-            expect(registry.getHandlersForType(type)).toContain(keyMapper);
-        }
-    });
-
-    it('should create registry with CommandExecutor registered for executor types', () => {
-        const keyMapper = new MockHandler(CommandType.MAP, MAPPING_COMMAND_TYPES);
-        const commandExecutor = new MockHandler(CommandType.OBCOMMAND, EXECUTOR_COMMAND_TYPES);
-
-        const registry = createConfiguredRegistry(keyMapper, commandExecutor);
-
-        // Check executor types are registered
-        for (const type of EXECUTOR_COMMAND_TYPES) {
-            expect(registry.hasHandler(type)).toBe(true);
-            expect(registry.getHandlersForType(type)).toContain(commandExecutor);
-        }
-    });
-
-    it('should route commands to correct handlers', async () => {
-        const keyMapper = new MockHandler(CommandType.MAP, MAPPING_COMMAND_TYPES);
-        const commandExecutor = new MockHandler(CommandType.OBCOMMAND, EXECUTOR_COMMAND_TYPES);
-
-        const registry = createConfiguredRegistry(keyMapper, commandExecutor);
-        const context = createMockContext();
-
-        // Test mapping command
-        const mapCommand = createMockCommand(CommandType.NMAP, ['jk', '<Esc>']);
-        await registry.execute(mapCommand, context);
-        expect(keyMapper.handledCommands).toHaveLength(1);
-
-        // Test executor command
-        const obCommand = createMockCommand(CommandType.OBCOMMAND, ['editor:save']);
-        await registry.execute(obCommand, context);
-        expect(commandExecutor.handledCommands).toHaveLength(1);
     });
 });
 

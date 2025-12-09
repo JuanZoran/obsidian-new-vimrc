@@ -39,11 +39,12 @@ export { SettingsManager, VimrcSettingTab } from './settings/SettingsManager';
 // UI
 export { SettingsTab } from './ui/SettingsTab';
 export type { SettingsTabConfig, ReloadCallback } from './ui/SettingsTab';
+export { VimModeStatusBar } from './ui/VimModeStatusBar';
+export type { VimModeStatusBarConfig } from './ui/VimModeStatusBar';
 
 // Registry
 export { 
     CommandRegistry, 
-    createConfiguredRegistry,
     MAPPING_COMMAND_TYPES,
     EXECUTOR_COMMAND_TYPES 
 } from './registry/CommandRegistry';

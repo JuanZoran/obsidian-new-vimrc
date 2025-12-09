@@ -56,3 +56,55 @@
 .vimrc-debug-modules .setting-item:last-child .setting-item-control {
   gap: 0.5em;
 }
+
+/* ==========================================
+ * Vim Mode Status Bar Styles
+ * ========================================== */
+
+/* Base status bar mode item */
+.vimrc-status-bar-mode {
+  font-weight: 600;
+  font-size: 11px;
+  padding: 0 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* Normal mode - blue/default */
+.vimrc-mode-normal {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* Insert mode - green */
+.vimrc-mode-insert {
+  background-color: var(--color-green);
+  color: var(--text-on-accent);
+}
+
+/* Visual mode - purple/magenta */
+.vimrc-mode-visual {
+  background-color: var(--color-purple);
+  color: var(--text-on-accent);
+}
+
+/* Replace mode - red/orange */
+.vimrc-mode-replace {
+  background-color: var(--color-red);
+  color: var(--text-on-accent);
+}
+
+/* Fallback colors for themes without color variables */
+.vimrc-mode-insert {
+  --color-green: #28a745;
+}
+
+.vimrc-mode-visual {
+  --color-purple: #6f42c1;
+}
+
+.vimrc-mode-replace {
+  --color-red: #dc3545;
+}

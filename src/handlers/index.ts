@@ -26,10 +26,6 @@ export type { ObmapHandlerDependencies, ObmapDefinition } from './ObmapHandler';
 export { ExmapHandler } from './ExmapHandler';
 export type { ExmapHandlerDependencies, ExmapDefinition } from './ExmapHandler';
 
-// Amap handler
-export { AmapHandler } from './AmapHandler';
-export type { AmapDefinition } from './AmapHandler';
-
 // Let handler
 export { LetHandler } from './LetHandler';
 export type {

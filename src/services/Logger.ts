@@ -171,11 +171,21 @@ export class ModuleLogger {
   }
 
   warn(message: string, ...args: unknown[]): void {
-    this.logger?.warn(this.module, message, ...args);
+    if (this.logger) {
+      this.logger.warn(this.module, message, ...args);
+    } else {
+      // Fallback when Logger not initialized
+      console.warn(`[Vimrc:${this.module}]`, message, ...args);
+    }
   }
 
   error(message: string, ...args: unknown[]): void {
-    this.logger?.error(this.module, message, ...args);
+    if (this.logger) {
+      this.logger.error(this.module, message, ...args);
+    } else {
+      // Fallback when Logger not initialized
+      console.error(`[Vimrc:${this.module}]`, message, ...args);
+    }
   }
 
   time(label: string): () => void {

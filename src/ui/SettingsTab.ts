@@ -122,6 +122,16 @@ export class SettingsTab extends PluginSettingTab {
           await this.updateSetting('showLoadNotification', value);
         })
       );
+
+    // Show Vim mode in status bar setting
+    new Setting(containerEl)
+      .setName('Show Vim mode in status bar')
+      .setDesc('Display the current Vim mode (Normal, Insert, Visual, Replace) in the status bar')
+      .addToggle((toggle) =>
+        toggle.setValue(settings.showVimModeInStatusBar).onChange(async (value) => {
+          await this.updateSetting('showVimModeInStatusBar', value);
+        })
+      );
   }
 
   /**

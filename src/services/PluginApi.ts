@@ -12,6 +12,9 @@
 import { App, MarkdownView } from 'obsidian';
 import type { IVimAdapter } from '../types/services';
 import type { VimrcSettings } from '../types/settings';
+import { getLogger } from './Logger';
+
+const log = getLogger('api');
 
 /** Position in editor */
 export interface EditorPosition {
@@ -104,17 +107,17 @@ export class PluginApi {
             }
           })
           .catch((error) => {
-            console.error(`[Vimrc] Motion <Plug>(${name}) error:`, error);
+            log.error(`Motion <Plug>(${name}) error:`, error);
           });
 
         return head;
       });
 
       this.vimAdapter.mapCommand(plugKey, 'motion', internalName);
-      this.debugLog(`Defined motion: <Plug>(${name})`);
+      log.debug(`Defined motion: <Plug>(${name})`);
       return true;
     } catch (error) {
-      console.error(`[Vimrc] Failed to define motion <Plug>(${name}):`, error);
+      log.error(`Failed to define motion <Plug>(${name}):`, error);
       return false;
     }
   }
@@ -128,10 +131,10 @@ export class PluginApi {
         callback(cm, vimState);
       });
 
-      this.debugLog(`Defined action: ${name}`);
+      log.debug(`Defined action: ${name}`);
       return true;
     } catch (error) {
-      console.error(`[Vimrc] Failed to define action ${name}:`, error);
+      log.error(`Failed to define action ${name}:`, error);
       return false;
     }
   }
@@ -140,10 +143,10 @@ export class PluginApi {
   mapMotion(keys: string, motionName: string): boolean {
     try {
       this.vimAdapter.mapCommand(keys, 'motion', motionName);
-      this.debugLog(`Mapped motion: ${keys} -> ${motionName}`);
+      log.debug(`Mapped motion: ${keys} -> ${motionName}`);
       return true;
     } catch (error) {
-      console.error(`[Vimrc] Failed to map motion ${keys}:`, error);
+      log.error(`Failed to map motion ${keys}:`, error);
       return false;
     }
   }
@@ -155,10 +158,10 @@ export class PluginApi {
       for (const context of ctxList) {
         this.vimAdapter.mapCommand(keys, 'action', actionName, undefined, { context });
       }
-      this.debugLog(`Mapped action: ${keys} -> ${actionName}`);
+      log.debug(`Mapped action: ${keys} -> ${actionName}`);
       return true;
     } catch (error) {
-      console.error(`[Vimrc] Failed to map action ${keys}:`, error);
+      log.error(`Failed to map action ${keys}:`, error);
       return false;
     }
   }
@@ -212,7 +215,7 @@ export class PluginApi {
     const editor = activeView?.editor;
 
     if (!editor) {
-      console.error(`[Vimrc] No active editor found!`);
+      log.error('No active editor found!');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cmAny = cm as any;
       if (typeof cmAny?.setCursor === 'function') {
@@ -281,7 +284,7 @@ export class PluginApi {
         break;
       default:
         editor.setCursor(end);
-        console.warn(`[Vimrc] Unknown operator: ${operator}`);
+        log.warn(`Unknown operator: ${operator}`);
     }
   }
 
@@ -311,7 +314,7 @@ export class PluginApi {
     this.debugLog(`Yanking text:`, text);
     this.pushToRegister('yank', text, vimState);
     navigator.clipboard?.writeText(text);
-    console.log(`[Vimrc] Yank completed`);
+    log.debug('Yank completed');
   }
 
   private executeIndent(editor: any, start: EditorPosition, end: EditorPosition, indent: boolean): void {
@@ -339,8 +342,6 @@ export class PluginApi {
   }
 
   private debugLog(message: string, ...args: unknown[]): void {
-    if (this.getSettings().debugMode) {
-      console.log(`[Vimrc] ${message}`, ...args);
-    }
+    log.debug(message, ...args);
   }
 }

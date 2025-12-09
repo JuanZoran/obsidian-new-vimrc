@@ -10,6 +10,9 @@
  */
 
 import { App, Notice } from 'obsidian';
+import { getLogger } from '../services/Logger';
+
+const log = getLogger('obmap');
 
 /**
  * Validation result for command existence check
@@ -89,7 +92,7 @@ export class ObsidianCommandExecutor {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       new Notice(`Failed to execute command '${commandId}': ${errorMessage}`);
-      console.error(`[Vimrc] Failed to execute command ${commandId}:`, error);
+      log.error(`Failed to execute command ${commandId}:`, error);
       return false;
     }
   }

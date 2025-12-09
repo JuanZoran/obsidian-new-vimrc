@@ -69,8 +69,13 @@ describe('ConfigManager', () => {
             vimAdapter: true,
             eventBus: false,
             config: false,
+            plugin: true,
+            registry: true,
+            api: true,
+            statusBar: false,
           },
         },
+        showVimModeInStatusBar: true,
       };
       persistence.setData(savedSettings);
 

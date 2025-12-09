@@ -4,14 +4,6 @@
  * 
  * Requirements:
  * - 6.4: Components communicate through well-defined interfaces
- * 
- * NOTE: This test file needs to be updated to use the new architecture.
- * The old KeyMapper and CommandExecutor have been replaced by:
- * - MappingHandler + MappingStore (for key mappings)
- * - ExmapHandler, ObmapHandler, AmapHandler (for command execution)
- * - EnhancedErrorHandler in infrastructure (for error handling)
- * 
- * TODO: Update in task 24.1
  */
 
 import { VimrcParser } from '../../src/services/VimrcParser';
@@ -20,9 +12,8 @@ import { ExmapHandler } from '../../src/handlers/ExmapHandler';
 import { MappingStore } from '../../src/stores/MappingStore';
 import { CommandRegistry } from '../../src/registry/CommandRegistry';
 import { ErrorHandler as EnhancedErrorHandler } from '../../src/infrastructure/ErrorHandler';
-import { ErrorSeverity } from '../../src/types/services';
 import { EventBus } from '../../src/core/EventBus';
-import { DEFAULT_SETTINGS, VimrcSettings, CommandType, VimMode, HandlerContext } from '../../src/types';
+import { DEFAULT_SETTINGS, VimrcSettings, CommandType, VimMode } from '../../src/types';
 
 // Mock Obsidian App
 const mockApp = {
@@ -39,8 +30,7 @@ const mockApp = {
     }
 };
 
-// Skip all tests until task 24.1 updates this file
-describe.skip('VimrcPlugin Integration', () => {
+describe('VimrcPlugin Integration', () => {
     let parser: VimrcParser;
     let mappingStore: MappingStore;
     let mappingHandler: MappingHandler;
@@ -90,14 +80,9 @@ imap jk <Esc>
             expect(result.commands.filter(c => c.type !== CommandType.COMMENT)).toHaveLength(3);
 
             // Apply through registry
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
-
             for (const command of result.commands) {
                 if (command.type !== CommandType.COMMENT && command.type !== CommandType.UNKNOWN) {
-                    await registry.execute(command, context);
+                    await registry.route(command);
                 }
             }
 
@@ -123,16 +108,11 @@ nmap <leader>q :q<CR>
             expect(result.errors).toHaveLength(0);
             
             // Apply through registry
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
-
             for (const command of result.commands) {
                 if (command.type !== CommandType.COMMENT && 
                     command.type !== CommandType.UNKNOWN &&
                     command.type !== CommandType.LET) {
-                    await registry.execute(command, context);
+                    await registry.route(command);
                 }
             }
 
@@ -154,14 +134,9 @@ exmap back obcommand app:go-back
             expect(result.errors).toHaveLength(0);
             
             // Apply through registry
-            const context: HandlerContext = {
-                plugin: {},
-                settings
-            };
-
             for (const command of result.commands) {
                 if (command.type !== CommandType.COMMENT && command.type !== CommandType.UNKNOWN) {
-                    await registry.execute(command, context);
+                    await registry.route(command);
                 }
             }
 
@@ -197,16 +172,11 @@ vmap > >gv
             expect(result.errors).toHaveLength(0);
             
             // Apply through registry
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
-
             for (const command of result.commands) {
                 if (command.type !== CommandType.COMMENT && 
                     command.type !== CommandType.UNKNOWN &&
                     command.type !== CommandType.LET) {
-                    await registry.execute(command, context);
+                    await registry.route(command);
                 }
             }
 
@@ -232,7 +202,6 @@ nmap k gk
             }
             
             expect(result.warnings).toHaveLength(1);
-            // Note: EnhancedErrorHandler has different API - check error count
             expect(errorHandler.getRecentErrors().length).toBeGreaterThan(0);
         });
 
@@ -250,14 +219,9 @@ nmap k gk
             expect(validCommands).toHaveLength(2);
             
             // Apply valid commands
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
-
             for (const command of result.commands) {
                 if (command.type !== CommandType.COMMENT && command.type !== CommandType.UNKNOWN) {
-                    await registry.execute(command, context);
+                    await registry.route(command);
                 }
             }
 
@@ -275,16 +239,12 @@ exmap test obcommand editor:follow-link
 `;
             // Parse and apply
             const result = parser.parse(vimrcContent);
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
 
             for (const command of result.commands) {
                 if (command.type !== CommandType.COMMENT && 
                     command.type !== CommandType.UNKNOWN &&
                     command.type !== CommandType.LET) {
-                    await registry.execute(command, context);
+                    await registry.route(command);
                 }
             }
 
@@ -307,11 +267,6 @@ exmap test obcommand editor:follow-link
 
     describe('Registry routing', () => {
         it('should route commands to correct handlers', async () => {
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
-
             // Test mapping commands go to MappingHandler
             const nmapCommand = {
                 type: CommandType.NMAP,
@@ -319,7 +274,7 @@ exmap test obcommand editor:follow-link
                 lineNumber: 1,
                 raw: 'nmap j gj'
             };
-            await registry.execute(nmapCommand, context);
+            await registry.route(nmapCommand);
             expect(mappingStore.count()).toBe(1);
 
             // Test exmap commands go to ExmapHandler
@@ -329,16 +284,11 @@ exmap test obcommand editor:follow-link
                 lineNumber: 2,
                 raw: 'exmap test obcommand editor:follow-link'
             };
-            await registry.execute(exmapCommand, context);
+            await registry.route(exmapCommand);
             expect(exmapHandler.getExmapCount()).toBe(1);
         });
 
         it('should handle all mapping command types', async () => {
-            const context: HandlerContext = {
-                plugin: { applyMappingToVim: jest.fn() },
-                settings
-            };
-
             const commandTypes = [
                 { type: CommandType.MAP, expectedMode: VimMode.ALL },
                 { type: CommandType.NMAP, expectedMode: VimMode.NORMAL },
@@ -351,14 +301,14 @@ exmap test obcommand editor:follow-link
             ];
 
             for (let i = 0; i < commandTypes.length; i++) {
-                const { type, expectedMode } = commandTypes[i];
+                const { type } = commandTypes[i];
                 const command = {
                     type,
                     args: [`key${i}`, `target${i}`],
                     lineNumber: i + 1,
                     raw: `${type} key${i} target${i}`
                 };
-                await registry.execute(command, context);
+                await registry.route(command);
             }
 
             expect(mappingStore.count()).toBe(8);
