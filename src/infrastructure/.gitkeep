@@ -1,0 +1,4 @@
+# Infrastructure services
+# - ConfigManager.ts
+# - ErrorHandler.ts
+# - Logger.ts

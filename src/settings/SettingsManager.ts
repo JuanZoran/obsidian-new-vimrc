@@ -1,13 +1,14 @@
-import { App, Notice, PluginSettingTab, Setting } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, Plugin } from 'obsidian';
 import { VimrcSettings, DEFAULT_SETTINGS } from '../types';
+import type { IConfigManager } from '../types/settings';
 
 /**
  * Manages plugin settings
  */
 export class SettingsManager {
-    private plugin: any; // Will be VimrcPlugin
+    private plugin: Plugin;
 
-    constructor(plugin: any) {
+    constructor(plugin: Plugin) {
         this.plugin = plugin;
     }
 
@@ -29,20 +30,24 @@ export class SettingsManager {
     /**
      * Create settings tab
      */
-    createSettingTab(plugin: any): PluginSettingTab {
+    createSettingTab(plugin: Plugin): PluginSettingTab {
         return new VimrcSettingTab(plugin.app, plugin);
     }
 }
 
 /**
  * Settings tab for the plugin
+ * 
+ * Supports both legacy plugin interface and new ConfigManager interface.
  */
 export class VimrcSettingTab extends PluginSettingTab {
-    plugin: any;
+    plugin: Plugin;
+    private configManager?: IConfigManager;
 
-    constructor(app: App, plugin: any) {
+    constructor(app: App, plugin: Plugin, configManager?: IConfigManager) {
         super(app, plugin);
         this.plugin = plugin;
+        this.configManager = configManager;
     }
 
     display(): void {
@@ -51,16 +56,17 @@ export class VimrcSettingTab extends PluginSettingTab {
 
         containerEl.createEl('h2', { text: 'Vimrc 插件设置' });
 
+        const settings = this.getSettings();
+
         // Vimrc file path
         new Setting(containerEl)
             .setName('Vimrc 文件路径')
             .setDesc('相对于 vault 根目录的路径（默认：.obsidian.vimrc）')
             .addText(text => text
                 .setPlaceholder('.obsidian.vimrc')
-                .setValue(this.plugin.settings.vimrcPath)
+                .setValue(settings.vimrcPath)
                 .onChange(async (value) => {
-                    this.plugin.settings.vimrcPath = value;
-                    await this.plugin.saveSettings();
+                    await this.updateSetting('vimrcPath', value);
                 }));
 
         // Show load notification
@@ -68,10 +74,9 @@ export class VimrcSettingTab extends PluginSettingTab {
             .setName('显示加载通知')
             .setDesc('加载 vimrc 配置时显示通知消息')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showLoadNotification)
+                .setValue(settings.showLoadNotification)
                 .onChange(async (value) => {
-                    this.plugin.settings.showLoadNotification = value;
-                    await this.plugin.saveSettings();
+                    await this.updateSetting('showLoadNotification', value);
                 }));
 
         // Debug mode
@@ -79,10 +84,9 @@ export class VimrcSettingTab extends PluginSettingTab {
             .setName('调试模式')
             .setDesc('在控制台输出详细的调试信息')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.debugMode)
+                .setValue(settings.debugMode)
                 .onChange(async (value) => {
-                    this.plugin.settings.debugMode = value;
-                    await this.plugin.saveSettings();
+                    await this.updateSetting('debugMode', value);
                 }));
 
         // Reload button
@@ -92,8 +96,43 @@ export class VimrcSettingTab extends PluginSettingTab {
             .addButton(button => button
                 .setButtonText('重新加载')
                 .onClick(async () => {
-                    await this.plugin.reloadVimrc();
+                    // Trigger reload through plugin if available
+                    if ('reloadVimrc' in this.plugin) {
+                        await (this.plugin as { reloadVimrc: () => Promise<void> }).reloadVimrc();
+                    }
                     new Notice('Vimrc 已重新加载');
                 }));
+    }
+
+    /**
+     * Get current settings from ConfigManager or legacy plugin
+     */
+    private getSettings(): VimrcSettings {
+        if (this.configManager) {
+            return this.configManager.getSettings();
+        }
+        // Legacy fallback
+        const legacyPlugin = this.plugin as unknown as { settings?: VimrcSettings };
+        return legacyPlugin.settings || DEFAULT_SETTINGS;
+    }
+
+    /**
+     * Update a setting value
+     */
+    private async updateSetting<K extends keyof VimrcSettings>(
+        key: K,
+        value: VimrcSettings[K]
+    ): Promise<void> {
+        if (this.configManager) {
+            await this.configManager.updateSettings({ [key]: value });
+        } else {
+            // Legacy fallback
+            const legacyPlugin = this.plugin as unknown as {
+                settings: VimrcSettings;
+                saveSettings: () => Promise<void>;
+            };
+            legacyPlugin.settings[key] = value;
+            await legacyPlugin.saveSettings();
+        }
     }
 }

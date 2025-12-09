@@ -2,7 +2,7 @@
  * Unit tests for VimrcParser
  */
 
-import { VimrcParser } from '../../src/parser/VimrcParser';
+import { VimrcParser } from '../../src/services/VimrcParser';
 import { CommandType } from '../../src/types';
 
 describe('VimrcParser', () => {

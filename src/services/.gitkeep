@@ -1,0 +1,5 @@
+# Application services
+# - FileWatcher.ts
+# - VimAdapter.ts
+# - VimrcLoader.ts
+# - VimrcParser.ts

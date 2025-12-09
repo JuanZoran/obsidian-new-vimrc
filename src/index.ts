@@ -5,17 +5,40 @@
 // Types
 export * from './types';
 
-// Parser
-export { VimrcParser } from './parser/VimrcParser';
+// Core
+export { ServiceContainer } from './core/ServiceContainer';
+export { EventBus } from './core/EventBus';
 
-// Mapper
-export { KeyMapper } from './mapper/KeyMapper';
+// Infrastructure
+export { ConfigManager } from './infrastructure/ConfigManager';
+export type { ISettingsPersistence } from './infrastructure/ConfigManager';
+export { ErrorHandler as EnhancedErrorHandler } from './infrastructure/ErrorHandler';
+export type { RecoveryResult, RecoveryStrategy, AggregatedError } from './infrastructure/ErrorHandler';
 
-// Executor
-export { CommandExecutor } from './executor/CommandExecutor';
+// Services
+export { VimAdapter } from './services/VimAdapter';
+export { VimrcLoader, createFileAdapter } from './services/VimrcLoader';
+export type { IFileAdapter } from './services/VimrcLoader';
+export { PluginApi } from './services/PluginApi';
+export type { EditorPosition, MotionCallbackArgs, MotionCallback, ActionCallback } from './services/PluginApi';
+export { Logger, ModuleLogger, getLogger } from './services/Logger';
+export type { LogLevel, LoggerConfig } from './services/Logger';
+
+// Stores
+export { MappingStore } from './stores/MappingStore';
+
+// Appliers
+export { MappingApplier } from './appliers/MappingApplier';
+
+// Parser (moved to services)
+export { VimrcParser } from './services/VimrcParser';
 
 // Settings
 export { SettingsManager, VimrcSettingTab } from './settings/SettingsManager';
+
+// UI
+export { SettingsTab } from './ui/SettingsTab';
+export type { SettingsTabConfig, ReloadCallback } from './ui/SettingsTab';
 
 // Registry
 export { 
@@ -25,9 +48,3 @@ export {
     EXECUTOR_COMMAND_TYPES 
 } from './registry/CommandRegistry';
 
-// Errors
-export { 
-    ErrorHandler, 
-    ErrorSeverity,
-    type ErrorReport 
-} from './errors/ErrorHandler';
