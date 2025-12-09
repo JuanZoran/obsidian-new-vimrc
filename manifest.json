@@ -1,0 +1,10 @@
+{
+	"id": "vimrc-support",
+	"name": "vimrc-support",
+	"version": "1.0.0",
+	"minAppVersion": "1.7.0",
+	"description": "尝试为obsidian提供完整的vimrc支持",
+	"author": "Zoran",
+	"authorUrl": "https://github.com/JuanZoran",
+	"isDesktopOnly": true
+}

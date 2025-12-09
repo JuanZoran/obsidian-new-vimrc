@@ -1,0 +1,25 @@
+{
+	"name": "vimrc-support",
+	"version": "1.0.0",
+	"description": "尝试为obsidian提供完整的vimrc支持",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [],
+	"author": "Zoran",
+	"license": "MIT",
+	"devDependencies": {
+		"@codemirror/view": "^6.35.0",
+		"@codemirror/state": "^6.5.0",
+		"@replit/codemirror-vim": "^6.2.1",
+		"@types/node": "^22.10.1",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.24.0",
+		"obsidian": "^1.7.2",
+		"tslib": "^2.8.1",
+		"typescript": "^5.7.2"
+	}
+}
