@@ -12,6 +12,7 @@
     "isolatedModules": true,
     "strict": true,
     "skipLibCheck": true,
+    "esModuleInterop": true,
     "lib": [
       "DOM",
       "ES2022"

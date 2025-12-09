@@ -1,6 +1,6 @@
 {
-	"id": "vimrc-support",
-	"name": "vimrc-support",
+	"id": "new-vimrc-support",
+	"name": "new-vimrc-support",
 	"version": "1.0.0",
 	"minAppVersion": "1.7.0",
 	"description": "尝试为obsidian提供完整的vimrc支持",
