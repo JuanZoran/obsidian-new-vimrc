@@ -165,6 +165,10 @@ export class VimrcParser {
             case 'VUNMAP':
                 type = CommandType.VUNMAP;
                 break;
+            // amap commands - mapping to async actions
+            case 'AMAP':
+                type = CommandType.AMAP;
+                break;
             case 'LET':
                 type = CommandType.LET;
                 break;

@@ -26,6 +26,8 @@ export enum CommandType {
     NUNMAP = 'nunmap',
     IUNMAP = 'iunmap',
     VUNMAP = 'vunmap',
+    // amap commands - mapping to async actions
+    AMAP = 'amap',
     LET = 'let',
     COMMENT = 'comment',
     UNKNOWN = 'unknown'

@@ -155,7 +155,9 @@ export const EXECUTOR_COMMAND_TYPES: CommandType[] = [
     CommandType.OBMAP,
     CommandType.NOBMAP,
     CommandType.IOBMAP,
-    CommandType.VOBMAP
+    CommandType.VOBMAP,
+    // amap commands - mapping to async actions
+    CommandType.AMAP
 ];
 
 /**

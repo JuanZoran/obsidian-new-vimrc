@@ -31,6 +31,17 @@ export interface ObmapDefinition {
 }
 
 /**
+ * Registered amap command definition
+ * Maps a key sequence to an async action (e.g., from plugins like Flash)
+ */
+export interface AmapDefinition {
+    key: string;
+    actionName: string;
+    mode: 'normal' | 'insert' | 'visual' | 'all';
+    lineNumber: number;
+}
+
+/**
  * Executes Obsidian commands from vimrc
  * Handles both obcommand and exmap directives
  * 
@@ -46,6 +57,7 @@ export class CommandExecutor implements CommandHandler {
     private app: App;
     private exmapDefinitions: Map<string, ExmapDefinition> = new Map();
     private obmapDefinitions: ObmapDefinition[] = [];
+    private amapDefinitions: AmapDefinition[] = [];
     private validatedCommands: Set<string> = new Set();
     private invalidCommands: Set<string> = new Set();
 
@@ -62,7 +74,8 @@ export class CommandExecutor implements CommandHandler {
                command.type === CommandType.OBMAP ||
                command.type === CommandType.NOBMAP ||
                command.type === CommandType.IOBMAP ||
-               command.type === CommandType.VOBMAP;
+               command.type === CommandType.VOBMAP ||
+               command.type === CommandType.AMAP;
     }
 
     /**
@@ -82,6 +95,8 @@ export class CommandExecutor implements CommandHandler {
                    command.type === CommandType.IOBMAP ||
                    command.type === CommandType.VOBMAP) {
             await this.handleObmap(command, context);
+        } else if (command.type === CommandType.AMAP) {
+            await this.handleAmap(command, context);
         }
     }
 
@@ -219,6 +234,61 @@ export class CommandExecutor implements CommandHandler {
     }
 
     /**
+     * Handle amap command - mapping key to async action
+     * Format: amap <key> <actionName> [mode]
+     * 
+     * Example:
+     *   amap s flashJump
+     *   amap s flashJump visual
+     */
+    private async handleAmap(command: ParsedCommand, context: HandlerContext): Promise<void> {
+        const args = command.args;
+        
+        if (args.length < 2) {
+            console.warn(`[Vimrc] amap requires key and action name at line ${command.lineNumber}`);
+            return;
+        }
+
+        const key = args[0];
+        const actionName = args[1];
+        
+        // Determine mode from optional third argument, default to 'normal'
+        let mode: 'normal' | 'insert' | 'visual' | 'all' = 'normal';
+        if (args.length >= 3) {
+            const modeArg = args[2].toLowerCase();
+            switch (modeArg) {
+                case 'normal':
+                    mode = 'normal';
+                    break;
+                case 'insert':
+                    mode = 'insert';
+                    break;
+                case 'visual':
+                    mode = 'visual';
+                    break;
+                case 'all':
+                    mode = 'all';
+                    break;
+                default:
+                    console.warn(`[Vimrc] Unknown mode '${modeArg}' at line ${command.lineNumber}, defaulting to 'normal'`);
+            }
+        }
+
+        // Store amap definition
+        const definition: AmapDefinition = {
+            key,
+            actionName,
+            mode,
+            lineNumber: command.lineNumber
+        };
+        this.amapDefinitions.push(definition);
+
+        if (context.settings.debugMode) {
+            console.log(`[Vimrc] Registered amap: ${key} -> ${actionName} (mode: ${mode})`);
+        }
+    }
+
+    /**
      * Execute an Obsidian command by ID
      * Called when user triggers a mapped key sequence
      * 
@@ -340,6 +410,20 @@ export class CommandExecutor implements CommandHandler {
     }
 
     /**
+     * Get all amap definitions
+     */
+    getAmapDefinitions(): AmapDefinition[] {
+        return [...this.amapDefinitions];
+    }
+
+    /**
+     * Get count of registered amaps
+     */
+    getAmapCount(): number {
+        return this.amapDefinitions.length;
+    }
+
+    /**
      * Check if a command ID was validated as valid
      */
     isCommandValid(commandId: string): boolean {
@@ -366,6 +450,7 @@ export class CommandExecutor implements CommandHandler {
     cleanup(): void {
         this.exmapDefinitions.clear();
         this.obmapDefinitions = [];
+        this.amapDefinitions = [];
         this.validatedCommands.clear();
         this.invalidCommands.clear();
     }

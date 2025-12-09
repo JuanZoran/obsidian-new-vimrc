@@ -105,6 +105,10 @@ export default class VimrcPlugin extends Plugin {
     private lastParseResult: ParseResult | null = null;
     private fileWatcherRegistered: boolean = false;
     private debounceTimer: NodeJS.Timeout | null = null;
+    
+    // Track registered async motions and pending amaps
+    private registeredAsyncMotions: Set<string> = new Set();
+    private pendingAmaps: Map<string, Array<{ key: string; mode: 'normal' | 'insert' | 'visual' | 'all' }>> = new Map();
 
     async onload(): Promise<void> {
         console.log('[Vimrc] Loading plugin...');
@@ -594,7 +598,34 @@ export default class VimrcPlugin extends Plugin {
             }
         }
 
-        console.log(`[Vimrc] Applied ${mappings.length} mappings, ${obmaps.length} obmaps, ${exmaps.length} exmaps to Vim`);
+        // Apply amap commands (mapping keys to async motions defined by other plugins)
+        // These are deferred until the async motion is registered via defineAsyncMotion
+        const amaps = this.commandExecutor.getAmapDefinitions();
+        let appliedAmaps = 0;
+        for (const amap of amaps) {
+            // Check if the async motion is already registered
+            if (this.registeredAsyncMotions.has(amap.actionName)) {
+                // Action already registered, apply immediately
+                try {
+                    this.applyAmapToVim(vimApi, amap.key, amap.actionName, amap.mode);
+                    appliedAmaps++;
+                } catch (error) {
+                    console.error(`[Vimrc] Failed to apply amap ${amap.key}:`, error);
+                }
+            } else {
+                // Action not yet registered, store as pending
+                const pending = this.pendingAmaps.get(amap.actionName) || [];
+                pending.push({ key: amap.key, mode: amap.mode });
+                this.pendingAmaps.set(amap.actionName, pending);
+                
+                if (this.settings.debugMode) {
+                    console.log(`[Vimrc] Deferred amap: ${amap.key} -> ${amap.actionName} (waiting for action registration)`);
+                }
+            }
+        }
+
+        const pendingCount = amaps.length - appliedAmaps;
+        console.log(`[Vimrc] Applied ${mappings.length} mappings, ${obmaps.length} obmaps, ${exmaps.length} exmaps, ${appliedAmaps} amaps to Vim (${pendingCount} amaps pending)`);
     }
 
     /**
@@ -623,6 +654,36 @@ export default class VimrcPlugin extends Plugin {
         // This method is kept for compatibility but does nothing immediately
         if (this.settings.debugMode) {
             console.log(`[Vimrc] Queued mapping: ${config.from} -> ${config.to}`);
+        }
+    }
+
+    /**
+     * Compare two positions
+     * @returns negative if a < b, 0 if equal, positive if a > b
+     */
+    private comparePos(a: CmPos, b: CmPos): number {
+        if (a.line !== b.line) {
+            return a.line - b.line;
+        }
+        return a.ch - b.ch;
+    }
+
+    /**
+     * Apply an amap to CodeMirror Vim
+     * Helper method to bind a key to an async motion
+     */
+    private applyAmapToVim(
+        vimApi: VimApi, 
+        key: string, 
+        motionName: string, 
+        mode: 'normal' | 'insert' | 'visual' | 'all'
+    ): void {
+        // For motions, we don't specify context so they work in all modes including operator-pending
+        // The mode parameter is kept for future use but motions inherently work across modes
+        vimApi.mapCommand(key, 'motion', motionName);
+
+        if (this.settings.debugMode) {
+            console.log(`[Vimrc] Applied amap to Vim: ${key} -> ${motionName} (type: motion, requested mode: ${mode})`);
         }
     }
 
@@ -657,6 +718,9 @@ export default class VimrcPlugin extends Plugin {
         
         // Clear last parse result
         this.lastParseResult = null;
+
+        // Clear pending amaps (but keep registered async motions - they're defined by other plugins)
+        this.pendingAmaps.clear();
 
         if (this.settings.debugMode) {
             console.log('[Vimrc] All mappings cleared');
@@ -973,23 +1037,120 @@ export default class VimrcPlugin extends Plugin {
         }
 
         try {
-            // We implement async motion as an action that handles operator-pending mode
-            vimApi.defineAction(name, (cm: any, actionArgs: any, vim: any) => {
-                const isOperatorPending = vim.inputState?.operatorShortcut != null || 
-                                          vim.inputState?.operator != null;
+            // Store the callback for later use
+            const asyncMotionCallback = callback;
+            
+            // Define a motion that captures operator state and triggers async flow
+            vimApi.defineMotion(name, (cm: any, head: CmPos, motionArgs: MotionArgs, vim: any) => {
+                // Capture the pending operator info from lastEditInputState
+                // When motion is called, Vim has already moved inputState to lastEditInputState
+                const editState = vim.lastEditInputState;
+                
+                // Only consider operator pending if the motion in lastEditInputState matches current motion
+                // This prevents using stale operator state from previous commands
+                const isCurrentMotion = editState?.motion === name;
+                const pendingOperator = isCurrentMotion ? editState?.operator : null;
+                const pendingOperatorArgs = isCurrentMotion ? editState?.operatorArgs : null;
+                const isOperatorPending = pendingOperator != null;
+                const isVisualMode = vim.visualMode === true;
+                const visualAnchor = isVisualMode ? cm.getCursor('anchor') : null;
+                
+                console.log(`[Vimrc] Async motion '${name}' triggered:`, {
+                    isOperatorPending,
+                    pendingOperator,
+                    isVisualMode,
+                    isCurrentMotion,
+                    editStateMotion: editState?.motion,
+                    head
+                });
                 
                 // Execute the async callback
-                callback(cm, vim, isOperatorPending).then((targetPos) => {
+                asyncMotionCallback(cm, vim, isOperatorPending).then((targetPos) => {
                     if (targetPos) {
-                        const cursor = cm.getCursor();
+                        const startPos = head; // Position when motion was triggered
                         
-                        if (isOperatorPending) {
-                            // If there's a pending operator, select the range and let the operator handle it
-                            // We need to simulate a visual selection for the operator
-                            cm.setSelection(cursor, targetPos);
-                            
-                            // The operator will be applied to the selection
-                            // This is a workaround since we can't directly integrate with operator-pending mode
+                        console.log(`[Vimrc] Async motion '${name}' completed:`, {
+                            startPos,
+                            targetPos,
+                            isOperatorPending,
+                            pendingOperator,
+                            isVisualMode
+                        });
+                        
+                        if (isVisualMode && visualAnchor) {
+                            // In visual mode, extend selection to target
+                            cm.setSelection(visualAnchor, targetPos);
+                        } else if (isOperatorPending && pendingOperator) {
+                            // Operator was pending, manually execute the operation
+                            // We need to select the range and then simulate the operator
+                            cm.operation(() => {
+                                // Determine the range (handle forward and backward motions)
+                                const from = this.comparePos(startPos, targetPos) < 0 ? startPos : targetPos;
+                                const to = this.comparePos(startPos, targetPos) < 0 ? targetPos : startPos;
+                                
+                                if (pendingOperator === 'delete' || pendingOperator === 'd') {
+                                    // Delete operation - also copies to register (like Vim)
+                                    const text = cm.getRange(from, to);
+                                    const linewise = from.ch === 0 && to.ch === 0;
+                                    
+                                    // Copy to register before deleting
+                                    // @ts-ignore
+                                    const CodeMirrorVim = (window as any).CodeMirrorAdapter?.Vim;
+                                    if (CodeMirrorVim?.getRegisterController) {
+                                        const registerController = CodeMirrorVim.getRegisterController();
+                                        const registerName = pendingOperatorArgs?.registerName || '"';
+                                        registerController.pushText(registerName, 'delete', text, linewise, false);
+                                    }
+                                    
+                                    // Delete the text
+                                    cm.replaceRange('', from, to);
+                                    cm.setCursor(from);
+                                } else if (pendingOperator === 'yank' || pendingOperator === 'y') {
+                                    // Yank operation - copy to Vim register
+                                    const text = cm.getRange(from, to);
+                                    const linewise = from.ch === 0 && to.ch === 0;
+                                    
+                                    // Access Vim's register controller via CodeMirrorAdapter.Vim.getRegisterController()
+                                    // @ts-ignore
+                                    const CodeMirrorVim = (window as any).CodeMirrorAdapter?.Vim;
+                                    
+                                    if (CodeMirrorVim?.getRegisterController) {
+                                        const registerController = CodeMirrorVim.getRegisterController();
+                                        // Get register name from operatorArgs or use default '"'
+                                        const registerName = pendingOperatorArgs?.registerName || '"';
+                                        
+                                        // pushText(registerName, operator, text, linewise, blockwise)
+                                        registerController.pushText(
+                                            registerName,
+                                            'yank',
+                                            text,
+                                            linewise,
+                                            false // blockwise
+                                        );
+                                        console.log(`[Vimrc] Yanked text to register '${registerName}':`, text.substring(0, 50));
+                                    } else {
+                                        console.warn('[Vimrc] Could not access Vim register controller');
+                                    }
+                                    
+                                    // Also copy to system clipboard
+                                    navigator.clipboard?.writeText(text);
+                                    cm.setCursor(from);
+                                } else if (pendingOperator === 'change' || pendingOperator === 'c') {
+                                    // Change operation - delete and enter insert mode
+                                    cm.replaceRange('', from, to);
+                                    cm.setCursor(from);
+                                    // Enter insert mode
+                                    // @ts-ignore
+                                    const CodeMirrorVim = (window as any).CodeMirrorAdapter?.Vim;
+                                    if (CodeMirrorVim?.handleKey) {
+                                        CodeMirrorVim.handleKey(cm, 'i', 'mapping');
+                                    }
+                                } else {
+                                    // Unknown operator, just select the range
+                                    console.warn(`[Vimrc] Unknown operator: ${pendingOperator}, selecting range`);
+                                    cm.setSelection(from, to);
+                                }
+                            });
                         } else {
                             // No operator pending, just move the cursor
                             cm.setCursor(targetPos);
@@ -999,11 +1160,35 @@ export default class VimrcPlugin extends Plugin {
                 }).catch((error) => {
                     console.error(`[Vimrc] Async motion ${name} failed:`, error);
                 });
+                
+                // Return current position immediately (motion is async, actual movement happens in callback)
+                return head;
             });
+
+            // Track this async motion as registered
+            this.registeredAsyncMotions.add(name);
 
             if (this.settings.debugMode) {
                 console.log(`[Vimrc] Defined async motion: ${name}`);
             }
+
+            // Apply any pending amaps for this action
+            const pendingMaps = this.pendingAmaps.get(name);
+            if (pendingMaps && pendingMaps.length > 0) {
+                for (const pending of pendingMaps) {
+                    try {
+                        this.applyAmapToVim(vimApi, pending.key, name, pending.mode);
+                        if (this.settings.debugMode) {
+                            console.log(`[Vimrc] Applied deferred amap: ${pending.key} -> ${name}`);
+                        }
+                    } catch (error) {
+                        console.error(`[Vimrc] Failed to apply deferred amap ${pending.key}:`, error);
+                    }
+                }
+                // Clear pending maps for this action
+                this.pendingAmaps.delete(name);
+            }
+
             return true;
         } catch (error) {
             console.error(`[Vimrc] Failed to define async motion ${name}:`, error);
