@@ -61,50 +61,57 @@
  * Vim Mode Status Bar Styles
  * ========================================== */
 
-/* Base status bar mode item */
+/* Base status bar mode item - Apple Style */
 .vimrc-status-bar-mode {
-  font-weight: 600;
-  font-size: 11px;
-  padding: 0 8px;
-  border-radius: 3px;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 60px;
+  padding: 0 10px;
+  margin: 0 4px;
+
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.5px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  text-transform: uppercase;
+  line-height: 1;
+  color: #ffffff; /* Always white text */
+
+  border-radius: 12px; /* Pill shape */
+  
+  /* Smooth transition */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Subtle text shadow */
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+  
+  /* Prevent selection */
+  user-select: none;
+  cursor: default;
 }
 
-/* Normal mode - blue/default */
+/* Normal Mode - System Blue */
 .vimrc-mode-normal {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
+  background: linear-gradient(135deg, #007AFF, #0056b3);
+  box-shadow: 0 2px 5px rgba(0, 122, 255, 0.25);
 }
 
-/* Insert mode - green */
+/* Insert Mode - System Green */
 .vimrc-mode-insert {
-  background-color: var(--color-green);
-  color: var(--text-on-accent);
+  background: linear-gradient(135deg, #34C759, #28a745);
+  box-shadow: 0 2px 5px rgba(52, 199, 89, 0.25);
 }
 
-/* Visual mode - purple/magenta */
+/* Visual Mode - System Purple */
 .vimrc-mode-visual {
-  background-color: var(--color-purple);
-  color: var(--text-on-accent);
+  background: linear-gradient(135deg, #AF52DE, #8e44ad);
+  box-shadow: 0 2px 5px rgba(175, 82, 222, 0.25);
 }
 
-/* Replace mode - red/orange */
+/* Replace Mode - System Red */
 .vimrc-mode-replace {
-  background-color: var(--color-red);
-  color: var(--text-on-accent);
-}
-
-/* Fallback colors for themes without color variables */
-.vimrc-mode-insert {
-  --color-green: #28a745;
-}
-
-.vimrc-mode-visual {
-  --color-purple: #6f42c1;
-}
-
-.vimrc-mode-replace {
-  --color-red: #dc3545;
+  background: linear-gradient(135deg, #FF3B30, #dc3545);
+  box-shadow: 0 2px 5px rgba(255, 59, 48, 0.25);
 }
