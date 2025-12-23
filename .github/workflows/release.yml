@@ -20,18 +20,15 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: new-vimrc/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: new-vimrc
         run: npm ci
 
       - name: Build
-        working-directory: new-vimrc
         run: npm run build
 
       - name: Prepare release assets
-        working-directory: new-vimrc
         run: |
           rm -rf release
           mkdir -p release
@@ -43,6 +40,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            new-vimrc/release/manifest.json
-            new-vimrc/release/main.js
-            new-vimrc/release/style.css
+            release/manifest.json
+            release/main.js
+            release/style.css
