@@ -1,6 +1,6 @@
 {
-	"name": "vimrc-support",
-	"version": "1.1.0",
+	"name": "new-vimrc-support",
+	"version": "1.2.0",
 	"description": "尝试为obsidian提供完整的vimrc支持",
 	"main": "main.js",
 	"scripts": {
