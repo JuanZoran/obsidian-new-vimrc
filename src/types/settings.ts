@@ -17,6 +17,7 @@ export type DebugModule =
   | 'plugin'      // Main plugin lifecycle
   | 'registry'    // CommandRegistry
   | 'api'         // PluginApi - public API for other plugins
+  | 'surround'    // SurroundService - built-in surround
   | 'statusBar';  // VimModeStatusBar - status bar UI
 
 /**
@@ -44,6 +45,7 @@ export const DEFAULT_DEBUG_MODULES: Record<DebugModule, boolean> = {
   plugin: true,
   registry: true,
   api: true,
+  surround: true,
   statusBar: false,
 };
 
@@ -62,6 +64,7 @@ export const DEBUG_MODULE_INFO: Record<DebugModule, { name: string; desc: string
   plugin: { name: 'Plugin', desc: 'Main plugin lifecycle events' },
   registry: { name: 'Registry', desc: 'Command registry operations' },
   api: { name: 'API', desc: 'Public API for other plugins' },
+  surround: { name: 'Surround', desc: 'Built-in surround mappings' },
   statusBar: { name: 'Status Bar', desc: 'Vim mode status bar UI' },
 };
 

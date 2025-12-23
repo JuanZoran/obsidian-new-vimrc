@@ -10,6 +10,7 @@
 - 🔄 文件修改后自动重载配置
 - 🛠️ 提供设置界面配置插件行为
 - 🐛 详细的错误提示和调试模式
+- 🧩 内置 Surround 操作（sa/sd/sr）
 
 ## 快速开始
 
@@ -39,6 +40,25 @@ nmap <leader>w :w<CR>
 
 保存文件后，插件会自动加载配置。你可以在设置中启用"显示加载通知"来确认配置已加载。
 
+## 插件集成（开发者）
+
+如果你需要让第三方插件提供自定义 motion（如 Flash 跳转），请参考 `new-vimrc/docs/API.md`。
+该 API 支持 `defineAsyncMotion`/`mapAsyncMotion`，可在异步交互完成后稳定执行 operator（d/c/y 等）。
+
+## 内置 Surround
+
+默认映射（Normal/Visual）：
+
+| 功能 | 映射 | 说明 |
+|------|------|------|
+| Add  | `sa` | Normal 模式：`sa` + motion；Visual 模式：选区后 `sa` |
+| Delete | `sd` | 删除光标所在行内最近的包裹 |
+| Replace | `sr` | 替换光标所在行内最近的包裹 |
+
+支持的包裹字符：`()`, `[]`, `{}`, `<>`，以及任意单字符（左右相同）。
+删除/替换当前为行内匹配的简化实现，暂不支持 tag/function 等高级规则。
+为避免 CodeMirror 内置 `s` 命令抢占，插件会暂时移除 Normal/Visual 的 `s` 映射，并在卸载时恢复。
+
 ## 支持的命令
 
 ### 键位映射命令
@@ -49,10 +69,12 @@ nmap <leader>w :w<CR>
 | `nmap` | 普通模式递归映射 | `nmap <leader>w :w<CR>` |
 | `imap` | 插入模式递归映射 | `imap jk <Esc>` |
 | `vmap` | 可视模式递归映射 | `vmap < <gv` |
+| `omap` | 操作符等待模式递归映射 | `omap iw <Plug>(yourTextObject)` |
 | `noremap` | 所有模式下的非递归映射 | `noremap j gj` |
 | `nnoremap` | 普通模式非递归映射 | `nnoremap <C-d> <C-d>zz` |
 | `inoremap` | 插入模式非递归映射 | `inoremap <C-c> <Esc>` |
 | `vnoremap` | 可视模式非递归映射 | `vnoremap > >gv` |
+| `onoremap` | 操作符等待模式非递归映射 | `onoremap iw <Plug>(yourTextObject)` |
 
 ### 取消映射命令
 

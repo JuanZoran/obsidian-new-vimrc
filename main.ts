@@ -14,9 +14,10 @@ import {
   CommandRegistry, SettingsTab, createFileAdapter, PluginApi, Logger, getLogger,
   VimModeStatusBar,
 } from './src';
+import { SurroundService } from './src/services/SurroundService';
 import { ServiceTokens } from './src/types/services';
 import type { VimrcSettings } from './src/types/settings';
-import type { MotionCallback, ActionCallback } from './src/services/PluginApi';
+import type { MotionCallback, AsyncMotionCallback, ActionCallback } from './src/services/PluginApi';
 import { MappingHandler } from './src/handlers/MappingHandler';
 import { ObmapHandler } from './src/handlers/ObmapHandler';
 import { ExmapHandler } from './src/handlers/ExmapHandler';
@@ -25,6 +26,7 @@ import { LetHandler } from './src/handlers/LetHandler';
 export default class VimrcPlugin extends Plugin {
   private container!: ServiceContainer;
   private pluginApi!: PluginApi;
+  private surroundService: SurroundService | null = null;
   private vimModeStatusBar: VimModeStatusBar | null = null;
   private fileWatcherRegistered = false;
   private debounceTimer: NodeJS.Timeout | null = null;
@@ -61,6 +63,13 @@ export default class VimrcPlugin extends Plugin {
     log.info('Unloading plugin...');
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     if (this.vimModeStatusBar) this.vimModeStatusBar.destroy();
+    if (this.surroundService) this.surroundService.cleanup();
+    if (this.container) {
+      const loader = this.container.resolve(ServiceTokens.VimrcLoader);
+      loader.cleanup().catch(() => {
+        // Ignore cleanup errors on unload
+      });
+    }
     if (this.container) this.container.dispose();
     log.info('Plugin unloaded');
   }
@@ -141,7 +150,11 @@ export default class VimrcPlugin extends Plugin {
     });
 
     // Initialize PluginApi
-    this.pluginApi = new PluginApi(this.app, vimAdapter, () => this.settings);
+    this.pluginApi = new PluginApi(this.app, vimAdapter);
+
+    // Register built-in surround mappings
+    this.surroundService = new SurroundService(this.app, vimAdapter);
+    this.surroundService.register();
   }
 
   private setupFileWatcher(): void {
@@ -198,6 +211,11 @@ export default class VimrcPlugin extends Plugin {
     return this.pluginApi.defineMotion(name, callback);
   }
 
+  /** Define an async motion with operator tracking */
+  defineAsyncMotion(name: string, callback: AsyncMotionCallback): boolean {
+    return this.pluginApi.defineAsyncMotion(name, callback);
+  }
+
   /** Define an action (for normal mode) */
   defineAction(name: string, callback: ActionCallback): boolean {
     return this.pluginApi.defineAction(name, callback);
@@ -206,6 +224,11 @@ export default class VimrcPlugin extends Plugin {
   /** Map keys to a motion */
   mapMotion(keys: string, motionName: string): boolean {
     return this.pluginApi.mapMotion(keys, motionName);
+  }
+
+  /** Map keys to an async motion */
+  mapAsyncMotion(keys: string, motionName: string, contexts?: string[]): boolean {
+    return this.pluginApi.mapAsyncMotion(keys, motionName, contexts);
   }
 
   /** Map keys to an action */

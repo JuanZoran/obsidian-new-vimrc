@@ -359,6 +359,8 @@ export class VimAdapter implements IVimAdapter {
         return 'insert';
       case 'visual':
         return 'visual';
+      case 'operatorPending':
+        return 'operatorPending';
       case 'all':
         return undefined; // undefined means all modes in CodeMirror
       default:

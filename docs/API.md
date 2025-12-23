@@ -6,7 +6,7 @@ This document describes the public API that other Obsidian plugins can use to ex
 
 ```typescript
 // In your plugin's onload() method
-const vimrcPlugin = this.app.plugins.plugins['vimrc-support'] as any;
+const vimrcPlugin = this.app.plugins.plugins['new-vimrc-support'] as any;
 
 // Check if the plugin is available
 if (!vimrcPlugin) {

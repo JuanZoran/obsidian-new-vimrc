@@ -10,10 +10,12 @@ export enum CommandType {
     NMAP = 'nmap',
     IMAP = 'imap',
     VMAP = 'vmap',
+    OMAP = 'omap',
     NOREMAP = 'noremap',
     NNOREMAP = 'nnoremap',
     INOREMAP = 'inoremap',
     VNOREMAP = 'vnoremap',
+    ONOREMAP = 'onoremap',
     OBCOMMAND = 'obcommand',
     EXMAP = 'exmap',
     // obmap commands - direct mapping to Obsidian commands
@@ -38,6 +40,7 @@ export enum VimMode {
     NORMAL = 'normal',
     INSERT = 'insert',
     VISUAL = 'visual',
+    OPERATOR_PENDING = 'operatorPending',
     ALL = 'all'
 }
 

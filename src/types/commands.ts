@@ -13,12 +13,14 @@ export enum CommandType {
   NMAP = 'nmap',
   IMAP = 'imap',
   VMAP = 'vmap',
+  OMAP = 'omap',
 
   // Non-recursive mapping commands
   NOREMAP = 'noremap',
   NNOREMAP = 'nnoremap',
   INOREMAP = 'inoremap',
   VNOREMAP = 'vnoremap',
+  ONOREMAP = 'onoremap',
 
   // Obsidian-specific commands
   OBCOMMAND = 'obcommand',
@@ -206,10 +208,12 @@ export const MAPPING_COMMAND_TYPES: CommandType[] = [
   CommandType.NMAP,
   CommandType.IMAP,
   CommandType.VMAP,
+  CommandType.OMAP,
   CommandType.NOREMAP,
   CommandType.NNOREMAP,
   CommandType.INOREMAP,
   CommandType.VNOREMAP,
+  CommandType.ONOREMAP,
   CommandType.UNMAP,
   CommandType.NUNMAP,
   CommandType.IUNMAP,
@@ -222,6 +226,7 @@ export const NON_RECURSIVE_COMMAND_TYPES: CommandType[] = [
   CommandType.NNOREMAP,
   CommandType.INOREMAP,
   CommandType.VNOREMAP,
+  CommandType.ONOREMAP,
 ];
 
 /** Unmap command types */

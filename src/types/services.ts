@@ -206,6 +206,11 @@ export interface IVimrcLoader {
   reload(): Promise<LoadResult>;
 
   /**
+   * Cleanup mappings and provider state
+   */
+  cleanup(): Promise<void>;
+
+  /**
    * Get the last load result
    */
   getLastResult(): LoadResult | null;

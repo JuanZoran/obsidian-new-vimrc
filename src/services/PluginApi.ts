@@ -11,7 +11,6 @@
 
 import { App, MarkdownView } from 'obsidian';
 import type { IVimAdapter } from '../types/services';
-import type { VimrcSettings } from '../types/settings';
 import { getLogger } from './Logger';
 
 const log = getLogger('api');
@@ -35,6 +34,13 @@ export type MotionCallback = (
   args: MotionCallbackArgs
 ) => Promise<EditorPosition | null>;
 
+/** Async motion callback type */
+export type AsyncMotionCallback = (
+  cm: unknown,
+  vim: unknown,
+  operatorPending: boolean
+) => Promise<EditorPosition | null>;
+
 /** Action callback type */
 export type ActionCallback = (cm: unknown, vim: unknown) => void;
 
@@ -52,12 +58,12 @@ interface VimApiWithRegister {
 export class PluginApi {
   private app: App;
   private vimAdapter: IVimAdapter;
-  private getSettings: () => VimrcSettings;
+  private motionRegistry = new Map<string, string>();
+  private asyncMotionTokens = new Map<string, number>();
 
-  constructor(app: App, vimAdapter: IVimAdapter, getSettings: () => VimrcSettings) {
+  constructor(app: App, vimAdapter: IVimAdapter) {
     this.app = app;
     this.vimAdapter = vimAdapter;
-    this.getSettings = getSettings;
   }
 
   /** Get the CodeMirror Vim API directly */
@@ -76,9 +82,9 @@ export class PluginApi {
     const plugKey = `<Plug>(${name})`;
 
     try {
-      this.vimAdapter.defineMotion(internalName, (cm: unknown, head: unknown, _motionArgs: unknown) => {
-        const vimContext = this.extractVimContext(cm, head);
-        const { currentHead, operator, operatorPending, visualMode, inputState, lastEditInputState } = vimContext;
+      this.vimAdapter.defineMotion(internalName, (cm: unknown, head: unknown, motionArgs: unknown) => {
+        const vimContext = this.extractVimContext(cm, head, motionArgs, internalName);
+        const { currentHead, operator, operatorPending, visualMode, inputState, lastEditInputState, vimState, consumeLastEditOperator } = vimContext;
 
         this.debugLog(`Motion <Plug>(${name}) triggered`, vimContext);
 
@@ -98,13 +104,10 @@ export class PluginApi {
             }
 
             this.debugLog(`Motion <Plug>(${name}) completed`, { target, operatorPending, operator, visualMode });
-            this.executeMotion(cm, currentHead, target, operator, visualMode);
-
-            // Clear lastEditInputState.operator to prevent false detection next time
-            if (operatorPending && lastEditInputState) {
-              lastEditInputState.operator = null;
-              lastEditInputState.operatorArgs = null;
+            if (consumeLastEditOperator && vimState) {
+              this.clearLastEditOperator(vimState, internalName);
             }
+            this.executeMotion(cm, currentHead, target, operator, visualMode);
           })
           .catch((error) => {
             log.error(`Motion <Plug>(${name}) error:`, error);
@@ -114,10 +117,72 @@ export class PluginApi {
       });
 
       this.vimAdapter.mapCommand(plugKey, 'motion', internalName);
+      this.motionRegistry.set(name, internalName);
       log.debug(`Defined motion: <Plug>(${name})`);
       return true;
     } catch (error) {
       log.error(`Failed to define motion <Plug>(${name}):`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Define an async motion that preserves operatorPending state.
+   *
+   * @param name - Motion name (creates <Plug>(name) mapping)
+   * @param callback - Async callback returning target position or null
+   */
+  defineAsyncMotion(name: string, callback: AsyncMotionCallback): boolean {
+    const internalName = `_plugin_async_motion_${name}`;
+    const plugKey = `<Plug>(${name})`;
+
+    try {
+      this.vimAdapter.defineMotion(internalName, (cm: unknown, head: unknown, motionArgs: unknown) => {
+        const vimContext = this.extractVimContext(cm, head, motionArgs, internalName);
+        const { currentHead, operator, operatorPending, visualMode, inputState, vimState, consumeLastEditOperator } = vimContext;
+
+        this.debugLog(`Async motion <Plug>(${name}) triggered`, vimContext);
+
+        if (inputState && operatorPending) {
+          this.debugLog(`Clearing vim operator state, was: ${operator}`);
+          inputState.operator = null;
+          inputState.operatorArgs = null;
+        }
+
+        const operatorToUse = operatorPending ? operator : undefined;
+        const token = (this.asyncMotionTokens.get(name) ?? 0) + 1;
+        this.asyncMotionTokens.set(name, token);
+
+        callback(cm, vimState, operatorPending)
+          .then((target) => {
+            if (this.asyncMotionTokens.get(name) !== token) {
+              return;
+            }
+
+            if (!target) {
+              this.debugLog(`Async motion <Plug>(${name}) cancelled`);
+              return;
+            }
+
+            this.debugLog(`Async motion <Plug>(${name}) completed`, { target, operatorPending, operator: operatorToUse, visualMode });
+            if (consumeLastEditOperator && vimState) {
+              this.clearLastEditOperator(vimState, internalName);
+            }
+            this.executeMotion(cm, currentHead, target, operatorToUse, visualMode);
+          })
+          .catch((error) => {
+            log.error(`Async motion <Plug>(${name}) error:`, error);
+          });
+
+        return head;
+      });
+
+      this.vimAdapter.mapCommand(plugKey, 'motion', internalName);
+      this.motionRegistry.set(name, internalName);
+      log.debug(`Defined async motion: <Plug>(${name})`);
+      return true;
+    } catch (error) {
+      log.error(`Failed to define async motion <Plug>(${name}):`, error);
       return false;
     }
   }
@@ -142,11 +207,28 @@ export class PluginApi {
   /** Map keys to a motion */
   mapMotion(keys: string, motionName: string): boolean {
     try {
-      this.vimAdapter.mapCommand(keys, 'motion', motionName);
+      const internalName = this.motionRegistry.get(motionName) ?? motionName;
+      this.vimAdapter.mapCommand(keys, 'motion', internalName);
       log.debug(`Mapped motion: ${keys} -> ${motionName}`);
       return true;
     } catch (error) {
       log.error(`Failed to map motion ${keys}:`, error);
+      return false;
+    }
+  }
+
+  /** Map keys to an async motion */
+  mapAsyncMotion(keys: string, motionName: string, contexts?: string[]): boolean {
+    try {
+      const internalName = this.motionRegistry.get(motionName) ?? motionName;
+      const ctxList = contexts?.length ? contexts : ['normal', 'visual'];
+      for (const context of ctxList) {
+        this.vimAdapter.mapCommand(keys, 'motion', internalName, undefined, { context });
+      }
+      log.debug(`Mapped async motion: ${keys} -> ${motionName}`);
+      return true;
+    } catch (error) {
+      log.error(`Failed to map async motion ${keys}:`, error);
       return false;
     }
   }
@@ -170,20 +252,49 @@ export class PluginApi {
   // Private Helper Methods
   // ==========================================
 
-  private extractVimContext(cm: unknown, head: unknown) {
+  private extractVimContext(
+    cm: unknown,
+    head: unknown,
+    motionArgs?: unknown,
+    internalMotionName?: string
+  ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const cmAny = cm as any;
     const vimState = cmAny?.state?.vim;
     const inputState = vimState?.inputState;
     const lastEditInputState = vimState?.lastEditInputState;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const motionAny = motionArgs as any;
 
     const visualMode = !!(vimState?.visualMode);
 
     let operator: string | undefined;
     if (inputState?.operator) {
       operator = inputState.operator;
-    } else if (lastEditInputState?.operator) {
+    } else if (vimState?.operator) {
+      operator = vimState.operator;
+    }
+
+    const operatorFromMotion =
+      motionAny?.operator ??
+      motionAny?.operatorArgs?.operator ??
+      motionAny?.operatorArgs?.op;
+    if (!operator && operatorFromMotion) {
+      operator = operatorFromMotion;
+    }
+
+    const operatorFromLastEdit =
+      !!(lastEditInputState?.operator && !lastEditInputState.motion);
+    const operatorFromLastEditForThisMotion =
+      !!(internalMotionName && lastEditInputState?.operator && lastEditInputState.motion === internalMotionName);
+    let consumeLastEditOperator = false;
+    const operatorPendingByMode = vimState?.mode === 'operatorPending';
+    if (!operator && operatorFromLastEdit) {
       operator = lastEditInputState.operator;
+    }
+    if (!operator && operatorFromLastEditForThisMotion) {
+      operator = lastEditInputState.operator;
+      consumeLastEditOperator = true;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -197,9 +308,29 @@ export class PluginApi {
       lastEditInputState,
       visualMode,
       operator,
-      operatorPending: !!operator,
+      operatorPending:
+        operatorPendingByMode ||
+        !!motionAny?.operatorPending ||
+        !!operator ||
+        operatorFromLastEdit ||
+        operatorFromLastEditForThisMotion,
+      consumeLastEditOperator,
       currentHead,
     };
+  }
+
+  private clearLastEditOperator(vimState: any, internalMotionName?: string): void {
+    const lastEditInputState = vimState?.lastEditInputState;
+    if (!lastEditInputState) {
+      return;
+    }
+
+    if (internalMotionName && lastEditInputState.motion !== internalMotionName) {
+      return;
+    }
+
+    lastEditInputState.operator = null;
+    lastEditInputState.operatorArgs = null;
   }
 
   private executeMotion(

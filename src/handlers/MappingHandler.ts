@@ -141,6 +141,9 @@ export class MappingHandler extends BaseHandler {
       case CT.VMAP:
       case CT.VNOREMAP:
         return VimMode.VISUAL;
+      case CT.OMAP:
+      case CT.ONOREMAP:
+        return VimMode.OPERATOR_PENDING;
       case CT.MAP:
       case CT.NOREMAP:
       default:

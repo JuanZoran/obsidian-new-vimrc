@@ -121,6 +121,9 @@ export class VimrcParser {
             case 'VMAP':
                 type = CommandType.VMAP;
                 break;
+            case 'OMAP':
+                type = CommandType.OMAP;
+                break;
             case 'NOREMAP':
                 type = CommandType.NOREMAP;
                 break;
@@ -132,6 +135,9 @@ export class VimrcParser {
                 break;
             case 'VNOREMAP':
                 type = CommandType.VNOREMAP;
+                break;
+            case 'ONOREMAP':
+                type = CommandType.ONOREMAP;
                 break;
             case 'OBCOMMAND':
                 type = CommandType.OBCOMMAND;

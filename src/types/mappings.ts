@@ -9,6 +9,7 @@ export enum VimMode {
   NORMAL = 'normal',
   INSERT = 'insert',
   VISUAL = 'visual',
+  OPERATOR_PENDING = 'operatorPending',
   ALL = 'all',
 }
 

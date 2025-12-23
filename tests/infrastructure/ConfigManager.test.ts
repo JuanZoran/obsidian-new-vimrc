@@ -72,6 +72,7 @@ describe('ConfigManager', () => {
             plugin: true,
             registry: true,
             api: true,
+            surround: true,
             statusBar: false,
           },
         },

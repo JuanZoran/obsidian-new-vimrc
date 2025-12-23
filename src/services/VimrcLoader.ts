@@ -23,6 +23,7 @@ import type {
 import type { IConfigManager } from '../types/settings';
 import type { ICommandRegistry, ParseResult, IObmapProvider, IExmapProvider, ObmapDefinition, ExmapDefinition } from '../types/commands';
 import type { IMappingApplier, IMappingStore } from '../types/mappings';
+import { VimMode } from '../types/mappings';
 import { EventType } from '../types/events';
 import { CommandType } from '../types/commands';
 import { getLogger } from './Logger';
@@ -99,6 +100,12 @@ export class VimrcLoader implements IVimrcLoader {
    * Exmap provider for getting exmap definitions (decoupled from ExmapHandler)
    */
   private exmapProvider: IExmapProvider | null = null;
+
+  /**
+   * Track applied Obmap/Exmap definitions for cleanup
+   */
+  private appliedObmaps: Array<{ key: string; mode: VimMode }> = [];
+  private appliedExmaps: string[] = [];
 
   /**
    * Last load result
@@ -269,16 +276,25 @@ export class VimrcLoader implements IVimrcLoader {
   async reload(): Promise<LoadResult> {
     log.info('Reloading vimrc...');
 
-    // Clear Vim mappings first
-    if (this.vimAdapter) {
-      this.vimAdapter.mapclear();
-    }
-
     // Unapply all existing mappings
     await this.mappingApplier.unapplyAll();
+    this.mappingStore.clear();
+
+    // Clear obmap/exmap registrations before reloading
+    this.clearAppliedObmaps();
+    this.clearAppliedExmaps();
+    this.resetProviders();
 
     // Load fresh configuration
     return this.load();
+  }
+
+  async cleanup(): Promise<void> {
+    await this.mappingApplier.unapplyAll();
+    this.mappingStore.clear();
+    this.clearAppliedObmaps();
+    this.clearAppliedExmaps();
+    this.resetProviders();
   }
 
   /**
@@ -329,12 +345,18 @@ export class VimrcLoader implements IVimrcLoader {
       // Map key to action based on mode
       if (obmap.mode === 'insert') {
         this.vimAdapter.mapCommand(obmap.key, 'action', actionName, undefined, { context: 'insert' });
+        this.appliedObmaps.push({ key: obmap.key, mode: VimMode.INSERT });
       } else if (obmap.mode === 'all') {
         this.vimAdapter.mapCommand(obmap.key, 'action', actionName, undefined, { context: 'normal' });
         this.vimAdapter.mapCommand(obmap.key, 'action', actionName, undefined, { context: 'visual' });
         this.vimAdapter.mapCommand(obmap.key, 'action', actionName, undefined, { context: 'insert' });
+        this.appliedObmaps.push({ key: obmap.key, mode: VimMode.NORMAL });
+        this.appliedObmaps.push({ key: obmap.key, mode: VimMode.VISUAL });
+        this.appliedObmaps.push({ key: obmap.key, mode: VimMode.INSERT });
       } else {
         this.vimAdapter.mapCommand(obmap.key, 'action', actionName, undefined, { context: obmap.mode });
+        const mode = obmap.mode === 'normal' ? VimMode.NORMAL : VimMode.VISUAL;
+        this.appliedObmaps.push({ key: obmap.key, mode });
       }
     } catch (error) {
       log.error(`Failed to apply obmap ${obmap.key}:`, error);
@@ -355,8 +377,47 @@ export class VimrcLoader implements IVimrcLoader {
       this.vimAdapter.defineEx(exmap.name, exmap.name, () => {
         provider.executeObsidianCommand(exmap.commandId);
       });
+      this.appliedExmaps.push(exmap.name);
     } catch (error) {
       log.error(`Failed to apply exmap ${exmap.name}:`, error);
+    }
+  }
+
+  private clearAppliedObmaps(): void {
+    if (!this.vimAdapter || this.appliedObmaps.length === 0) {
+      this.appliedObmaps = [];
+      return;
+    }
+
+    for (const obmap of this.appliedObmaps) {
+      this.vimAdapter.unmap(obmap.key, obmap.mode);
+    }
+
+    this.appliedObmaps = [];
+  }
+
+  private clearAppliedExmaps(): void {
+    if (!this.vimAdapter || this.appliedExmaps.length === 0) {
+      this.appliedExmaps = [];
+      return;
+    }
+
+    for (const exmapName of this.appliedExmaps) {
+      this.vimAdapter.defineEx(exmapName, exmapName, () => {});
+    }
+
+    this.appliedExmaps = [];
+  }
+
+  private resetProviders(): void {
+    const obmapProvider = this.obmapProvider as unknown as { cleanup?: () => void } | null;
+    if (obmapProvider?.cleanup) {
+      obmapProvider.cleanup();
+    }
+
+    const exmapProvider = this.exmapProvider as unknown as { cleanup?: () => void } | null;
+    if (exmapProvider?.cleanup) {
+      exmapProvider.cleanup();
     }
   }
 

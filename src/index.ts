@@ -20,7 +20,7 @@ export { VimAdapter } from './services/VimAdapter';
 export { VimrcLoader, createFileAdapter } from './services/VimrcLoader';
 export type { IFileAdapter } from './services/VimrcLoader';
 export { PluginApi } from './services/PluginApi';
-export type { EditorPosition, MotionCallbackArgs, MotionCallback, ActionCallback } from './services/PluginApi';
+export type { EditorPosition, MotionCallbackArgs, MotionCallback, AsyncMotionCallback, ActionCallback } from './services/PluginApi';
 export { Logger, ModuleLogger, getLogger } from './services/Logger';
 export type { LogLevel, LoggerConfig } from './services/Logger';
 
@@ -48,4 +48,3 @@ export {
     MAPPING_COMMAND_TYPES,
     EXECUTOR_COMMAND_TYPES 
 } from './registry/CommandRegistry';
-
